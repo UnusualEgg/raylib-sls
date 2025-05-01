@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
+use std::ffi::c_int;
 use parking_lot::{Mutex, MutexGuard};
 mod state;
 use raylib::prelude::*;
