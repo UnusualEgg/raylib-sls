@@ -1,10 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 use parking_lot::{Mutex, MutexGuard};
-use std::ffi::c_int;
-mod player;
 mod state;
-pub(crate) use player::Player;
 use raylib::prelude::*;
 pub(crate) use state::State;
 
@@ -24,15 +21,17 @@ extern "C" fn draw_loop() {
     state.draw();
 
     let rl: &RaylibHandle = state.rl.as_ref().unwrap();
-    //#[cfg(target_family = "wasm")]
     if rl.is_key_pressed(KeyboardKey::KEY_RIGHT) {
         println!("Goodbye!");
         state.rl = None;
         state.t = None;
+        #[cfg(target_family = "wasm")]
         unsafe {
             emscripten_pause_main_loop();
+            return;
         }
-        return;
+        #[cfg(not(target_family = "wasm"))]
+        std::process::exit(0);
     }
 }
 
@@ -45,17 +44,10 @@ fn main() {
 
     #[cfg(not(target_family = "wasm"))]
     {
-        while !STATE
-            .lock()
-            .unwrap()
-            .rl
-            .as_ref()
-            .unwrap()
-            .window_should_close()
-        {
+        while !STATE.lock().rl.as_ref().unwrap().window_should_close() {
             draw_loop();
         }
-        let mut state = STATE.lock().unwrap();
+        let mut state = STATE.lock();
         state.rl = None;
         state.t = None;
     }

@@ -10,7 +10,7 @@ lazy_static = "1.5.0"
 parking_lot = "0.12.3"
 raylib = "5.5.1"
 serde_json = "1.0.140"
-slslib = {path="../slslib"}
+slslib = {path="slslib"}
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
