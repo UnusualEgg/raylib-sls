@@ -1,5 +1,8 @@
 [build]
-target = "wasm32-unknown-emscripten"
+#target = "wasm32-unknown-emscripten"
 [env]
 EMCC_CFLAGS = "-s WASM=1 -s ASYNCIFY -s USE_GLFW=3 -DGRPAHICS_API_OPENGL_ES2 -sEXPORTED_FUNCTIONS=_main -sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
 #EMCC_CFLAGS = "-Os -sUSE_GLFW=3 -sGL_ENABLE_GET_PROC_ADDRESS -sWASM=1 -sALLOW_MEMORY_GROWTH=1 -sWASM_MEM_MAX=512MB -sTOTAL_MEMORY=513MB -sABORTING_MALLOC=0 -sASYNCIFY -sFORCE_FILESYSTEM=1 -sASSERTIONS=1 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXPORTED_RUNTIME_METHODS=ccallcwrap"
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-Clink-arg=-fuse-ld=/usr/bin/mold", "-Clink-arg=-Wl,--no-rosegment"]

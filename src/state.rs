@@ -215,6 +215,9 @@ impl State {
                         draw.draw_rectangle_v(pos, Vector2::new(50.0 - 5.0, 50.0 - 5.0), color);
                     }
                     _ => {
+                        let color = if let Some(ic) = comp.ic_instance {
+                            ic.header.
+                        }
                         let pos = Vector2::new(comp.x, comp.y);
                         draw.draw_rectangle_v(
                             pos,
