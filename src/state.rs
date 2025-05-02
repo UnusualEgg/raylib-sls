@@ -3,6 +3,13 @@ use std::collections::HashMap;
 use raylib::core::math::Vector2;
 use raylib::prelude::*;
 use raylib::{camera::Camera2D, color::Color, ffi::Gesture, RaylibHandle};
+use slslib::sls::{self, NodeType, ID};
+
+fn max<T: PartialOrd>(n1: T, n2: T) -> T {
+    std::cmp::max_by(n1, n2, |a, b| {
+        a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+    })
+}
 
 pub struct State {
     pub rl: Option<raylib::core::RaylibHandle>,
@@ -12,51 +19,45 @@ pub struct State {
     last: Option<Vector2>,
     last_two: Option<(Vector2, Vector2)>,
     comp_indexes: HashMap<ID, usize>, //components index
+    pinch: Option<Vector2>,
 }
-use slslib::sls::{self, NodeType, ID};
-
-enum IO {
-    Input,
-    Output,
+const MIN_COMP_SIZE: f32 = 50.0;
+const MIN_OUTER_PADDING: f32 = PIN_SIZE + 5.0;
+const PIN_SPACING: f32 = (PIN_SIZE * 2.0) + 2.0;
+const PIN_SIZE: f32 = 5.0;
+const PIN_COLOR: Color = Color::GRAY;
+const PIN_LEN: f32 = PIN_SIZE + 2.0;
+fn calculate_comp_height(max_pins: usize) -> f32 {
+    let height: f32 = (max_pins as f32 * PIN_SPACING) + MIN_OUTER_PADDING;
+    max(height, MIN_COMP_SIZE)
 }
-const COMP_SIZE: f32 = 50.0;
-const OUTER_PADDING: f32 = 5.0;
-const PIN_SPACING: f32 = 2.0;
-fn calculate_comp_size(max_pins: usize) -> Vector2 {
-    let height: f32 = (max_pins as f32 * PIN_SPACING) + OUTER_PADDING;
-    let width: f32 = COMP_SIZE;
-    Vector2 {
-        x: width,
-        y: height,
-    }
-}
-fn calculate_io_pos(
-    io: IO,
-    pos: &Vector2,
-    num_of_pins: usize,
-    max_pins: usize,
-    pin: usize,
-) -> Vector2 {
-    match io {
-        IO::Input => {
-            let comp_size = calculate_comp_size(max_pins);
-            todo!()
-        }
-    }
+//returns pos of first pin on left
+//add width to get right pin pos
+//add PIN_SPACING to get next pin
+fn calculate_pin_height(num_of_pins: usize, comp_height: f32) -> f32 {
+    let pins_space = num_of_pins as f32 * PIN_SPACING;
+    let real_padding = comp_height - pins_space;
+    let skip = real_padding / 2.0;
+    skip + (PIN_SIZE)
 }
 impl State {
     pub fn new() -> Self {
         let (rl, t) = raylib::init()
             .size(400, 400)
             .title("Hello World")
-            .resizable()
+            //.resizable()
             .build();
+        rl.set_gestures_enabled(
+            Gesture::GESTURE_TAP as u32
+                | Gesture::GESTURE_PINCH_OUT as u32
+                | Gesture::GESTURE_PINCH_IN as u32,
+        );
 
-        let circ = include_str!("../OR");
+        let circ = include_str!("../../../../sls/prog-proc-8-bit.slj");
         let mut n: sls::Circuit = serde_json::from_str(circ).unwrap();
         n.init_circ(None);
         let cam = Camera2D {
-            offset: Vector2::zero(),
+            offset: Vector2::new(200.0, 200.0),
             target: Vector2::zero(),
             rotation: 0.0,
             zoom: 1.0,
@@ -74,10 +75,15 @@ impl State {
             last: None,
             last_two: None,
             comp_indexes: positions,
+            pinch: None,
         }
     }
     pub fn update(&mut self) {
         let rl: &RaylibHandle = self.rl.as_ref().unwrap();
+        if rl.is_window_resized() {
+            self.cam.offset.x = rl.get_render_width()as f32 / 2.0;
+            self.cam.offset.y = rl.get_render_height()as f32 / 2.0;
+        }
         let gesture = rl.get_gesture_detected();
         let mouse = rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT);
         let touch_point_count = if mouse { 1 } else { rl.get_touch_point_count() };
@@ -97,9 +103,9 @@ impl State {
                 for i in self.circuit.inputs.iter() {
                     let comp = &mut self.circuit.components[*i];
                     if current.x >= comp.x
-                        && current.x <= comp.x + COMP_SIZE
+                        && current.x <= comp.x + MIN_COMP_SIZE
                         && current.y >= comp.y
-                        && current.y <= comp.y + COMP_SIZE
+                        && current.y <= comp.y + MIN_COMP_SIZE
                     {
                         if comp.node_type == NodeType::PULSE_BUTTON {
                             comp.next_outputs[0] = true;
@@ -111,9 +117,9 @@ impl State {
                 for i in self.circuit.inputs.iter() {
                     let comp = &mut self.circuit.components[*i];
                     if current.x >= comp.x
-                        && current.x <= comp.x + COMP_SIZE
+                        && current.x <= comp.x + MIN_COMP_SIZE
                         && current.y >= comp.y
-                        && current.y <= comp.y + COMP_SIZE
+                        && current.y <= comp.y + MIN_COMP_SIZE
                     {
                         if comp.node_type == NodeType::TOGGLE_BUTTON {
                             comp.next_outputs[0] = !comp.next_outputs[0];
@@ -127,22 +133,15 @@ impl State {
                 for i in self.circuit.inputs.iter() {
                     let comp = &mut self.circuit.components[*i];
                     if last.x >= comp.x
-                        && last.x <= comp.x + COMP_SIZE
+                        && last.x <= comp.x + MIN_COMP_SIZE
                         && last.y >= comp.y
-                        && last.y <= comp.y + COMP_SIZE
+                        && last.y <= comp.y + MIN_COMP_SIZE
                     {
                         if comp.node_type == NodeType::PULSE_BUTTON {
                             comp.next_outputs[0] = false;
                         }
                     }
                 }
-            }
-        }
-        if let Some((last1, last2)) = self.last_two {
-            if rl.get_touch_point_count() == 2 {
-                let current1 = (rl.get_touch_position(0));
-                let current2 = (rl.get_touch_position(1));
-                //TODO zoom
             }
         }
         match gesture {
@@ -157,13 +156,18 @@ impl State {
                 self.last = None;
             }
         }
-        match touch_point_count {
-            2 => {
-                self.last_two = Some((rl.get_touch_position(0), rl.get_touch_position(1)));
+        if rl.is_gesture_detected(Gesture::GESTURE_PINCH_IN)
+            || rl.is_gesture_detected(Gesture::GESTURE_PINCH_OUT)
+        {
+            let pinch = rl.get_gesture_pinch_vector();
+            if let Some(last) = self.pinch {
+                let diff = pinch.length() - last.length();
+                //let middle_x = rl.get_touch_x() + pinch.x;
+                self.cam.zoom += diff;
             }
-            _ => {
-                self.last_two = None;
-            }
+            self.pinch = Some(pinch);
+        } else {
+            self.pinch = None;
         }
         self.circuit.tick();
     }
@@ -177,6 +181,9 @@ impl State {
             let mut draw = draw.begin_mode2D(self.cam);
             draw.draw_circle(0, 0, 50.0, Color::PINK);
             for comp in &self.circuit.components {
+                let num_in = comp.input_states.len();
+                let num_out = comp.outputs.borrow().len();
+                let in_height = calculate_comp_height(max(num_in, num_out));
                 match comp.node_type {
                     sls::NodeType::LIGHT_BULB => {
                         let b: bool = comp.outputs.try_borrow().unwrap()[0];
@@ -203,9 +210,55 @@ impl State {
                     _ => {
                         let pos = Vector2::new(comp.x, comp.y);
                         draw.draw_rectangle_v(pos, Vector2::new(50.0, 50.0), Color::GRAY);
+                        if let Some(label) = &comp.label {
+                            let size = draw.measure_text(label, 12/self.cam.zoom as i32);
+                            draw.draw_text(label, (comp.y+(MIN_COMP_SIZE/2.0))as i32-(size/2), comp.y as i32+in_height as i32, 12/self.cam.zoom as i32,Color::BLACK);
+                        }
                     }
                 }
                 //draw wires
+                let in_y_off = calculate_pin_height(num_in, in_height);
+                let in_y_to = comp.y + in_y_off;
+                let out_height = calculate_comp_height(max(num_out, num_out));
+                let out_y_off = calculate_pin_height(num_out, in_height);
+                let out_y_to = comp.y + out_y_off;
+                for i in 0..num_in {
+                    let pin_pos =
+                        Vector2::new(comp.x - PIN_LEN, in_y_to + (PIN_SPACING * i as f32));
+                    let comp_pos = Vector2::new(comp.x, in_y_to + (PIN_SPACING * i as f32));
+                    draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
+                    draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
+                }
+                for i in 0..num_out {
+                    let pin_pos = Vector2::new(
+                        comp.x + PIN_LEN + MIN_COMP_SIZE,
+                        out_y_to + (PIN_SPACING * i as f32),
+                    );
+                    let comp_pos =
+                        Vector2::new(comp.x + MIN_COMP_SIZE, out_y_to + (PIN_SPACING * i as f32));
+                    draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
+                    draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
+                }
+                for input in &comp.inputs {
+                    let from: &slslib::sls::Component = &self
+                        .circuit
+                        .components
+                        .get(*self.comp_indexes.get(&input.other_id).unwrap())
+                        .unwrap();
+                    let from_num_in = from.input_states.len();
+                    let from_num_out = from.outputs.borrow().len();
+                    let from_height = calculate_comp_height(max(from_num_out, from_num_out));
+                    let from_y_off = calculate_pin_height(from_num_out, from_height);
+                    let y_from = from.y + from_y_off + (input.other_pin as f32 * PIN_SPACING);
+                    let from_vec = Vector2::new(from.x + MIN_COMP_SIZE + PIN_LEN, y_from);
+                    let y_to = comp.y + in_y_off + (input.in_pin as f32 * PIN_SPACING);
+                    let to_vec = Vector2::new(comp.x - PIN_LEN, y_to);
+                    let on = from.outputs.borrow()[input.other_pin];
+                    const ON_COLOR: Color = Color::GREEN;
+                    const OFF_COLOR: Color = Color::BLACK;
+                    let color = if on { ON_COLOR } else { OFF_COLOR };
+                    draw.draw_line_v(from_vec, to_vec, color);
+                }
             }
         }
         //draw.gui_window_box(
