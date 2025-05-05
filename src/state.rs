@@ -260,15 +260,17 @@ impl State {
                     draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
                     draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                 }
-                for i in 0..to_num_out {
-                    let pin_pos = Vector2::new(
-                        comp.x + PIN_LEN + MIN_COMP_SIZE,
-                        to_out_y + (PIN_SPACING * i as f32),
-                    );
-                    let comp_pos =
+                if comp.node_type!=NodeType::LIGHT_BULB {
+                    for i in 0..to_num_out {
+                        let pin_pos = Vector2::new(
+                            comp.x + PIN_LEN + MIN_COMP_SIZE,
+                            to_out_y + (PIN_SPACING * i as f32),
+                        );
+                        let comp_pos =
                         Vector2::new(comp.x + MIN_COMP_SIZE, to_out_y + (PIN_SPACING * i as f32));
-                    draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
-                    draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
+                        draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
+                        draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
+                    }
                 }
                 for input in &comp.inputs {
                     let from: &slslib::sls::Component = &self
