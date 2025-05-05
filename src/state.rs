@@ -278,7 +278,7 @@ impl State {
                         .unwrap();
                     let from_num_in = from.input_states.len();
                     let from_num_out = from.outputs.len();
-                    let from_height = calculate_comp_height(max(from_num_out, from_num_out));
+                    let from_height = calculate_comp_height(max(from_num_in, from_num_out));
                     let from_y_off = calculate_pin_height(from_num_out, from_height);
                     let y_from = from.y + from_y_off + (input.other_pin as f32 * PIN_SPACING);
                     let from_vec = Vector2::new(from.x + MIN_COMP_SIZE + PIN_LEN, y_from);
