@@ -28,6 +28,7 @@ const PIN_SPACING: f32 = (PIN_SIZE * 2.0) + 2.0;
 const PIN_SIZE: f32 = 5.0;
 const PIN_COLOR: Color = Color::GRAY;
 const PIN_LEN: f32 = PIN_SIZE + 2.0;
+const WIRE_THICKNES:f32 = 2.0;
 fn calculate_comp_height(max_pins: usize) -> f32 {
     let height: f32 = (max_pins as f32 * PIN_SPACING) + MIN_OUTER_PADDING;
     max(height, MIN_COMP_SIZE)
@@ -266,7 +267,7 @@ impl State {
                     let pin_pos =
                         Vector2::new(comp.x - PIN_LEN, to_in_y + (PIN_SPACING * i as f32));
                     let comp_pos = Vector2::new(comp.x, to_in_y + (PIN_SPACING * i as f32));
-                    draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
+                    draw.draw_line_ex(pin_pos, comp_pos, WIRE_THICKNES, PIN_COLOR);
                     draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                 }
                 if comp.node_type!=NodeType::LIGHT_BULB {
@@ -277,7 +278,7 @@ impl State {
                         );
                         let comp_pos =
                         Vector2::new(comp.x + MIN_COMP_SIZE, to_out_y + (PIN_SPACING * i as f32));
-                        draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
+                        draw.draw_line_ex(pin_pos, comp_pos, WIRE_THICKNES, PIN_COLOR);
                         draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                     }
                 }
@@ -299,7 +300,7 @@ impl State {
                     const ON_COLOR: Color = Color::GREEN;
                     const OFF_COLOR: Color = Color::BLACK;
                     let color = if on { ON_COLOR } else { OFF_COLOR };
-                    draw.draw_line_v(from_vec, to_vec, color);
+                    draw.draw_line_ex(from_vec, to_vec, WIRE_THICKNES, color);
                 }
             }
         }
