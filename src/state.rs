@@ -266,8 +266,10 @@ impl State {
                 for i in 0..to_num_in {
                     let pin_pos =
                         Vector2::new(comp.x - PIN_LEN, to_in_y + (PIN_SPACING * i as f32));
+                    let pin_pos_line =
+                        Vector2::new(comp.x - PIN_LEN + PIN_SIZE, to_in_y + (PIN_SPACING * i as f32));
                     let comp_pos = Vector2::new(comp.x, to_in_y + (PIN_SPACING * i as f32));
-                    draw.draw_line_ex(pin_pos, comp_pos, WIRE_THICKNES, PIN_COLOR);
+                    draw.draw_line_ex(pin_pos_line, comp_pos, WIRE_THICKNES, PIN_COLOR);
                     draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                 }
                 if comp.node_type!=NodeType::LIGHT_BULB {
@@ -276,9 +278,13 @@ impl State {
                             comp.x + PIN_LEN + MIN_COMP_SIZE,
                             to_out_y + (PIN_SPACING * i as f32),
                         );
+                        let pin_pos_line = Vector2::new(
+                            comp.x + PIN_LEN + MIN_COMP_SIZE - PIN_SIZE,
+                            to_out_y + (PIN_SPACING * i as f32),
+                        );
                         let comp_pos =
                         Vector2::new(comp.x + MIN_COMP_SIZE, to_out_y + (PIN_SPACING * i as f32));
-                        draw.draw_line_ex(pin_pos, comp_pos, WIRE_THICKNES, PIN_COLOR);
+                        draw.draw_line_ex(pin_pos_line, comp_pos, WIRE_THICKNES, PIN_COLOR);
                         draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                     }
                 }
