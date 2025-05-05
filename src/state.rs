@@ -46,7 +46,7 @@ impl State {
         let (rl, t) = raylib::init()
             .size(400, 400)
             .title("Hello World")
-            //.resizable()
+            .resizable()
             .build();
         rl.set_gestures_enabled(
             Gesture::GESTURE_TAP as u32
@@ -80,7 +80,7 @@ impl State {
         }
     }
     pub fn update(&mut self) {
-        let rl: &RaylibHandle = self.rl.as_ref().unwrap();
+        let rl: &mut RaylibHandle = self.rl.as_mut().unwrap();
         if rl.is_window_resized() {
             self.cam.offset.x = rl.get_render_width() as f32 / 2.0;
             self.cam.offset.y = rl.get_render_height() as f32 / 2.0;
@@ -175,6 +175,9 @@ impl State {
             self.pinch = Some(pinch);
         } else {
             self.pinch = None;
+        }
+        if rl.is_key_pressed(KeyboardKey::KEY_F) {
+            rl.toggle_fullscreen();
         }
         self.circuit.tick();
     }
