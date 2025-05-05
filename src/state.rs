@@ -182,6 +182,10 @@ impl State {
         self.circuit.tick();
     }
     pub fn draw(&mut self) {
+        const BUTTON_BORDER:f32 = 5.0;
+        const LABEL_SIZE:i32 = 24;
+        const NOTE_SIZE:i32 = 48;
+
         let rl = self.rl.as_mut().unwrap();
         let t = self.t.as_ref().unwrap();
         let mut draw = rl.begin_drawing(t);
@@ -194,7 +198,6 @@ impl State {
                 let to_num_in = comp.input_states.len();
                 let to_num_out = comp.outputs.len();
                 let to_height = calculate_comp_height(max(to_num_in, to_num_out));
-                const BUTTON_BORDER:f32 = 5.0;
                 match comp.node_type {
                     sls::NodeType::LIGHT_BULB => {
                         let b: bool = comp.outputs[0];
@@ -221,9 +224,7 @@ impl State {
                     }
                     sls::NodeType::NOTE => {
                         let text:&str = &comp.text.as_ref().expect("text field of NODE");
-                        draw.draw_text(text, comp.x as i32, comp.y as i32, 12, Color::BLACK);
-
-                        
+                        draw.draw_text(text, comp.x as i32, comp.y as i32, NOTE_SIZE, Color::BLACK);
                     }
                     _ => {
                         let color = if let Some(ic) = &comp.ic_instance {
@@ -245,12 +246,12 @@ impl State {
                     }
                 }
                 if let Some(label) = &comp.label {
-                    let size = draw.measure_text(label, 12);
+                    let size = draw.measure_text(label, LABEL_SIZE);
                     draw.draw_text(
                         label,
                         (comp.x + (MIN_COMP_SIZE / 2.0)) as i32 - (size / 2),
                         (comp.y + to_height) as i32,
-                        12,
+                        LABEL_SIZE,
                         Color::BLACK,
                     );
                 }
