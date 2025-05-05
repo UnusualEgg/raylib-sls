@@ -189,7 +189,7 @@ impl State {
             draw.draw_circle(0, 0, 50.0, Color::PINK);
             for comp in &self.circuit.components {
                 let to_num_in = comp.input_states.len();
-                let to_num_out = comp.outputs.borrow().len();
+                let to_num_out = comp.outputs.len();
                 let to_height = calculate_comp_height(max(to_num_in, to_num_out));
                 match comp.node_type {
                     sls::NodeType::LIGHT_BULB => {
@@ -215,14 +215,21 @@ impl State {
                         draw.draw_rectangle_v(pos, Vector2::new(50.0 - 5.0, 50.0 - 5.0), color);
                     }
                     _ => {
-                        let color = if let Some(ic) = comp.ic_instance {
-                            ic.header.color.unwrap_or(Color::GRAY)
-                        };
+                        let color = if let Some(ic) = &comp.ic_instance {
+                            match ic.header.color{
+                                Some(c) => {
+                                    Color::new(c.r, c.g, c.b, 255)
+                                }
+                                None => {
+                                    Color::GRAY
+                                }
+                            } 
+                        } else {Color::GRAY};
                         let pos = Vector2::new(comp.x, comp.y);
                         draw.draw_rectangle_v(
                             pos,
                             Vector2::new(MIN_COMP_SIZE, to_height),
-                            Color::GRAY,
+                            color,
                         );
                         if let Some(label) = &comp.label {
                             let size = draw.measure_text(label, 12);
