@@ -219,6 +219,12 @@ impl State {
                         let pos = Vector2::new(comp.x + BUTTON_BORDER, comp.y + BUTTON_BORDER);
                         draw.draw_rectangle_v(pos, Vector2::new(MIN_COMP_SIZE - (BUTTON_BORDER*2.0), MIN_COMP_SIZE - (BUTTON_BORDER*2.0)), color);
                     }
+                    sls::NodeType::NOTE => {
+                        let text:&str = &comp.text.as_ref().expect("text field of NODE");
+                        draw.draw_text(text, comp.x as i32, comp.y as i32, 12, Color::BLACK);
+
+                        
+                    }
                     _ => {
                         let color = if let Some(ic) = &comp.ic_instance {
                             match ic.header.color{
