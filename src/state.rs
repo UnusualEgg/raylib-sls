@@ -236,17 +236,17 @@ impl State {
                             Vector2::new(MIN_COMP_SIZE, to_height),
                             color,
                         );
-                        if let Some(label) = &comp.label {
-                            let size = draw.measure_text(label, 12);
-                            draw.draw_text(
-                                label,
-                                (comp.x + (MIN_COMP_SIZE / 2.0)) as i32 - (size / 2),
-                                (comp.y + to_height) as i32,
-                                12,
-                                Color::BLACK,
-                            );
-                        }
                     }
+                }
+                if let Some(label) = &comp.label {
+                    let size = draw.measure_text(label, 12);
+                    draw.draw_text(
+                        label,
+                        (comp.x + (MIN_COMP_SIZE / 2.0)) as i32 - (size / 2),
+                        (comp.y + to_height) as i32,
+                        12,
+                        Color::BLACK,
+                    );
                 }
                 //draw wires
                 //wire goes *from* one component *to* this component
