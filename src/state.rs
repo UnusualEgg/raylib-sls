@@ -89,8 +89,8 @@ impl State {
         let scroll = rl.get_mouse_wheel_move();
         if scroll != 0.0 {
             let mouse_pos = rl.get_mouse_position();
-            self.cam.offset = mouse_pos;
             let world_pos = rl.get_screen_to_world2D(mouse_pos, self.cam);
+            self.cam.offset = mouse_pos;
             self.cam.target = world_pos;
 
             // uses log scaling to provide consistent zoom
