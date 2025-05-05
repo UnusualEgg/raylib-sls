@@ -182,25 +182,25 @@ impl State {
             draw.draw_circle(0, 0, 50.0, Color::PINK);
             for comp in &self.circuit.components {
                 let num_in = comp.input_states.len();
-                let num_out = comp.outputs.borrow().len();
+                let num_out = comp.outputs.len();
                 let in_height = calculate_comp_height(max(num_in, num_out));
                 match comp.node_type {
                     sls::NodeType::LIGHT_BULB => {
-                        let b: bool = comp.outputs.try_borrow().unwrap()[0];
+                        let b: bool = comp.outputs[0];
                         let color = if b { Color::LIGHTGREEN } else { Color::BLACK };
                         let pos = Vector2::new(comp.x + 25.0, comp.y + 25.0);
                         draw.draw_circle_v(pos, 25.0, Color::GRAY);
                         draw.draw_circle_v(pos, 20.0, color);
                     }
                     sls::NodeType::PULSE_BUTTON => {
-                        let b: bool = comp.outputs.try_borrow().unwrap()[0];
+                        let b: bool = comp.outputs[0];
                         let color = if b { Color::DARKRED } else { Color::RED };
                         let pos = Vector2::new(comp.x + 25.0, comp.y + 25.0);
                         draw.draw_circle_v(pos, 25.0, Color::ORANGE);
                         draw.draw_circle_v(pos, 20.0, color);
                     }
                     sls::NodeType::TOGGLE_BUTTON => {
-                        let b: bool = comp.outputs.try_borrow().unwrap()[0];
+                        let b: bool = comp.outputs[0];
                         let color = if b { Color::DARKRED } else { Color::RED };
                         let pos = Vector2::new(comp.x, comp.y);
                         draw.draw_rectangle_v(pos, Vector2::new(50.0, 50.0), Color::ORANGE);
@@ -246,14 +246,14 @@ impl State {
                         .get(*self.comp_indexes.get(&input.other_id).unwrap())
                         .unwrap();
                     let from_num_in = from.input_states.len();
-                    let from_num_out = from.outputs.borrow().len();
+                    let from_num_out = from.outputs.len();
                     let from_height = calculate_comp_height(max(from_num_out, from_num_out));
                     let from_y_off = calculate_pin_height(from_num_out, from_height);
                     let y_from = from.y + from_y_off + (input.other_pin as f32 * PIN_SPACING);
                     let from_vec = Vector2::new(from.x + MIN_COMP_SIZE + PIN_LEN, y_from);
                     let y_to = comp.y + in_y_off + (input.in_pin as f32 * PIN_SPACING);
                     let to_vec = Vector2::new(comp.x - PIN_LEN, y_to);
-                    let on = from.outputs.borrow()[input.other_pin];
+                    let on = from.outputs[input.other_pin];
                     const ON_COLOR: Color = Color::GREEN;
                     const OFF_COLOR: Color = Color::BLACK;
                     let color = if on { ON_COLOR } else { OFF_COLOR };
