@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use raylib::core::math::Vector2;
 use raylib::prelude::*;
@@ -53,7 +54,7 @@ impl State {
                 | Gesture::GESTURE_PINCH_IN as u32,
         );
 
-        let circ = include_str!("../../../../sls/prog-proc-8-bit.slj");
+        let circ = include_str!("../sls/prog-proc-8-bit.slj");
         let mut n: sls::Circuit = serde_json::from_str(circ).unwrap();
         n.init_circ(None);
         let cam = Camera2D {
@@ -81,11 +82,21 @@ impl State {
     pub fn update(&mut self) {
         let rl: &RaylibHandle = self.rl.as_ref().unwrap();
         if rl.is_window_resized() {
-            self.cam.offset.x = rl.get_render_width()as f32 / 2.0;
-            self.cam.offset.y = rl.get_render_height()as f32 / 2.0;
+            self.cam.offset.x = rl.get_render_width() as f32 / 2.0;
+            self.cam.offset.y = rl.get_render_height() as f32 / 2.0;
         }
-        let gesture = rl.get_gesture_detected();
         let mouse = rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT);
+        let scroll = rl.get_mouse_wheel_move();
+        if scroll != 0.0 {
+            let mouse_pos = rl.get_mouse_position();
+            self.cam.offset = mouse_pos;
+            let world_pos = rl.get_screen_to_world2D(mouse_pos, self.cam);
+            self.cam.target = world_pos;
+
+            // uses log scaling to provide consistent zoom
+            let scale = 0.2 * scroll;
+            self.cam.zoom = (self.cam.zoom.ln() + scale).exp().clamp(0.125, 64.0);
+        }
         let touch_point_count = if mouse { 1 } else { rl.get_touch_point_count() };
         if touch_point_count == 1 {
             let current = rl.get_screen_to_world2D(
@@ -144,10 +155,6 @@ impl State {
                 }
             }
         }
-        match gesture {
-            Gesture::GESTURE_DRAG => {}
-            _ => (),
-        }
         match touch_point_count {
             1 => {
                 self.last = Some(rl.get_touch_position(0));
@@ -181,9 +188,9 @@ impl State {
             let mut draw = draw.begin_mode2D(self.cam);
             draw.draw_circle(0, 0, 50.0, Color::PINK);
             for comp in &self.circuit.components {
-                let num_in = comp.input_states.len();
-                let num_out = comp.outputs.len();
-                let in_height = calculate_comp_height(max(num_in, num_out));
+                let to_num_in = comp.input_states.len();
+                let to_num_out = comp.outputs.borrow().len();
+                let to_height = calculate_comp_height(max(to_num_in, to_num_out));
                 match comp.node_type {
                     sls::NodeType::LIGHT_BULB => {
                         let b: bool = comp.outputs[0];
@@ -208,34 +215,48 @@ impl State {
                         draw.draw_rectangle_v(pos, Vector2::new(50.0 - 5.0, 50.0 - 5.0), color);
                     }
                     _ => {
+                        let color = if let Some(ic) = comp.ic_instance {
+                            ic.header.color.unwrap_or(Color::GRAY)
+                        };
                         let pos = Vector2::new(comp.x, comp.y);
-                        draw.draw_rectangle_v(pos, Vector2::new(50.0, 50.0), Color::GRAY);
+                        draw.draw_rectangle_v(
+                            pos,
+                            Vector2::new(MIN_COMP_SIZE, to_height),
+                            Color::GRAY,
+                        );
                         if let Some(label) = &comp.label {
-                            let size = draw.measure_text(label, 12/self.cam.zoom as i32);
-                            draw.draw_text(label, (comp.y+(MIN_COMP_SIZE/2.0))as i32-(size/2), comp.y as i32+in_height as i32, 12/self.cam.zoom as i32,Color::BLACK);
+                            let size = draw.measure_text(label, 12);
+                            draw.draw_text(
+                                label,
+                                (comp.x + (MIN_COMP_SIZE / 2.0)) as i32 - (size / 2),
+                                (comp.y + to_height) as i32,
+                                12,
+                                Color::BLACK,
+                            );
                         }
                     }
                 }
                 //draw wires
-                let in_y_off = calculate_pin_height(num_in, in_height);
-                let in_y_to = comp.y + in_y_off;
-                let out_height = calculate_comp_height(max(num_out, num_out));
-                let out_y_off = calculate_pin_height(num_out, in_height);
-                let out_y_to = comp.y + out_y_off;
-                for i in 0..num_in {
+                //wire goes *from* one component *to* this component
+                //plus components have *in*put pins and *out*put pins
+                let to_in_y_offset = calculate_pin_height(to_num_in, to_height);
+                let to_in_y = comp.y + to_in_y_offset;
+                let to_out_y_offset = calculate_pin_height(to_num_out, to_height);
+                let to_out_y = comp.y + to_out_y_offset;
+                for i in 0..to_num_in {
                     let pin_pos =
-                        Vector2::new(comp.x - PIN_LEN, in_y_to + (PIN_SPACING * i as f32));
-                    let comp_pos = Vector2::new(comp.x, in_y_to + (PIN_SPACING * i as f32));
+                        Vector2::new(comp.x - PIN_LEN, to_in_y + (PIN_SPACING * i as f32));
+                    let comp_pos = Vector2::new(comp.x, to_in_y + (PIN_SPACING * i as f32));
                     draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
                     draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                 }
-                for i in 0..num_out {
+                for i in 0..to_num_out {
                     let pin_pos = Vector2::new(
                         comp.x + PIN_LEN + MIN_COMP_SIZE,
-                        out_y_to + (PIN_SPACING * i as f32),
+                        to_out_y + (PIN_SPACING * i as f32),
                     );
                     let comp_pos =
-                        Vector2::new(comp.x + MIN_COMP_SIZE, out_y_to + (PIN_SPACING * i as f32));
+                        Vector2::new(comp.x + MIN_COMP_SIZE, to_out_y + (PIN_SPACING * i as f32));
                     draw.draw_line_v(pin_pos, comp_pos, PIN_COLOR);
                     draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                 }
@@ -251,7 +272,7 @@ impl State {
                     let from_y_off = calculate_pin_height(from_num_out, from_height);
                     let y_from = from.y + from_y_off + (input.other_pin as f32 * PIN_SPACING);
                     let from_vec = Vector2::new(from.x + MIN_COMP_SIZE + PIN_LEN, y_from);
-                    let y_to = comp.y + in_y_off + (input.in_pin as f32 * PIN_SPACING);
+                    let y_to = comp.y + to_in_y_offset + (input.in_pin as f32 * PIN_SPACING);
                     let to_vec = Vector2::new(comp.x - PIN_LEN, y_to);
                     let on = from.outputs[input.other_pin];
                     const ON_COLOR: Color = Color::GREEN;

@@ -11,6 +11,9 @@ parking_lot = "0.12.3"
 raylib = "5.5.1"
 serde_json = "1.0.140"
 slslib = {path="slslib"}
+[profile.dev]
+opt-level = 3
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
+debug = true
