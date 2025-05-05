@@ -194,6 +194,7 @@ impl State {
                 let to_num_in = comp.input_states.len();
                 let to_num_out = comp.outputs.len();
                 let to_height = calculate_comp_height(max(to_num_in, to_num_out));
+                const BUTTON_BORDER:f32 = 5.0;
                 match comp.node_type {
                     sls::NodeType::LIGHT_BULB => {
                         let b: bool = comp.outputs[0];
@@ -205,17 +206,18 @@ impl State {
                     sls::NodeType::PULSE_BUTTON => {
                         let b: bool = comp.outputs[0];
                         let color = if b { Color::DARKRED } else { Color::RED };
-                        let pos = Vector2::new(comp.x + 25.0, comp.y + 25.0);
-                        draw.draw_circle_v(pos, 25.0, Color::ORANGE);
-                        draw.draw_circle_v(pos, 20.0, color);
+                        const BUTTON_RADIUS:f32 = MIN_COMP_SIZE/2.0;
+                        let pos = Vector2::new(comp.x + BUTTON_RADIUS, comp.y + BUTTON_RADIUS);
+                        draw.draw_circle_v(pos, BUTTON_RADIUS, Color::ORANGE);
+                        draw.draw_circle_v(pos, BUTTON_RADIUS - BUTTON_BORDER, color);
                     }
                     sls::NodeType::TOGGLE_BUTTON => {
                         let b: bool = comp.outputs[0];
                         let color = if b { Color::DARKRED } else { Color::RED };
                         let pos = Vector2::new(comp.x, comp.y);
-                        draw.draw_rectangle_v(pos, Vector2::new(50.0, 50.0), Color::ORANGE);
-                        let pos = Vector2::new(comp.x + 5.0, comp.y + 5.0);
-                        draw.draw_rectangle_v(pos, Vector2::new(50.0 - 5.0, 50.0 - 5.0), color);
+                        draw.draw_rectangle_v(pos, Vector2::new(MIN_COMP_SIZE, MIN_COMP_SIZE), Color::ORANGE);
+                        let pos = Vector2::new(comp.x + BUTTON_BORDER, comp.y + BUTTON_BORDER);
+                        draw.draw_rectangle_v(pos, Vector2::new(MIN_COMP_SIZE - (BUTTON_BORDER*2.0), MIN_COMP_SIZE - (BUTTON_BORDER*2.0)), color);
                     }
                     _ => {
                         let color = if let Some(ic) = &comp.ic_instance {
