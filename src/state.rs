@@ -157,7 +157,7 @@ impl State {
             }
         }
         match touch_point_count {
-            1 => {
+            1|2 => {
                 self.last = Some(rl.get_touch_position(0));
             }
             _ => {
@@ -191,7 +191,6 @@ impl State {
         let t = self.t.as_ref().unwrap();
         let mut draw = rl.begin_drawing(t);
         draw.clear_background(Color::RAYWHITE);
-        draw.draw_fps(0, 0);
         {
             let mut draw = draw.begin_mode2D(self.cam);
             draw.draw_circle(0, 0, 50.0, Color::PINK);
@@ -310,6 +309,7 @@ impl State {
                 }
             }
         }
+        draw.draw_fps(0, 0);
         //draw.gui_window_box(
         //    Rectangle::new(0.0, 0.0, 70.0, 70.0),
         //    Some(c"To the window to the wall"),
