@@ -44,18 +44,8 @@ fn calculate_pin_height(num_of_pins: usize, comp_height: f32) -> f32 {
 }
 impl State {
     pub fn new() -> Self {
-        let (rl, t) = raylib::init()
-            .size(400, 400)
-            .title("Hello World")
-            .resizable()
-            .build();
-        rl.set_gestures_enabled(
-            Gesture::GESTURE_TAP as u32
-                | Gesture::GESTURE_PINCH_OUT as u32
-                | Gesture::GESTURE_PINCH_IN as u32,
-        );
 
-        let circ = include_str!("../sls/prog-proc-8-bit.slj");
+        let circ = include_str!("../sls/v3/7de475f0-1ff5-46c1-941c-dd4dd18f6224");
         let mut n: sls::Circuit = serde_json::from_str(circ).unwrap();
         n.init_circ(None);
         let cam = Camera2D {
@@ -69,6 +59,16 @@ impl State {
         for (i, comp) in n.components.iter().enumerate() {
             positions.insert(comp.get_id().clone(), i);
         }
+        let (rl, t) = raylib::init()
+            .size(400, 400)
+            .title("Hello World")
+            .resizable()
+            .build();
+        rl.set_gestures_enabled(
+            Gesture::GESTURE_TAP as u32
+                | Gesture::GESTURE_PINCH_OUT as u32
+                | Gesture::GESTURE_PINCH_IN as u32,
+        );
         State {
             rl: Some(rl),
             t: Some(t),
@@ -98,8 +98,12 @@ impl State {
             let scale = 0.2 * scroll;
             self.cam.zoom = (self.cam.zoom.ln() + scale).exp().clamp(0.125, 64.0);
         }
-        let touch_point_count = if mouse { 1 } else { rl.get_touch_point_count() };
+        let real_count=rl.get_touch_point_count();
+        let touch_point_count = if real_count==0&&mouse { 1 } else { rl.get_touch_point_count() };
         if touch_point_count == 1 {
+            if mouse {
+                println!("Mouse");
+            }
             let current = rl.get_screen_to_world2D(
                 if mouse {
                     rl.get_mouse_position()
@@ -310,6 +314,11 @@ impl State {
             }
         }
         draw.draw_fps(0, 0);
+        let tp1 = draw.get_touch_position(0);
+        let tp2 = draw.get_touch_position(1);
+        draw.draw_circle_v(tp1, 5.0, Color::PINK);
+        draw.draw_circle_v(tp2, 5.0, Color::PURPLE);
+
         //draw.gui_window_box(
         //    Rectangle::new(0.0, 0.0, 70.0, 70.0),
         //    Some(c"To the window to the wall"),

@@ -15,5 +15,6 @@ slslib = {path="slslib"}
 opt-level = 3
 [profile.release]
 # Tell `rustc` to optimize for small code size.
-opt-level = 3
-debug = true
+opt-level = "s"
+#uncomment for flamegraph
+#debug = true
