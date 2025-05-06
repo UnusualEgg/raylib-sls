@@ -1,3 +1,6 @@
 [submodule "slslib"]
 	path = slslib
 	url = https://github.com/UnusualEgg/slslib.git
+[submodule "sls"]
+	path = sls
+	url = https://github.com/UnusualEgg/sls.git

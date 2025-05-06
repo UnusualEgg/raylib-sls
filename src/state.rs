@@ -4,7 +4,7 @@ use std::time::Instant;
 use raylib::core::math::Vector2;
 use raylib::prelude::*;
 use raylib::{camera::Camera2D, color::Color, ffi::Gesture, RaylibHandle};
-use slslib::sls::{self, NodeType, ID};
+use slslib::sls::{self, Circuit, NodeType, ID};
 
 fn max<T: PartialOrd>(n1: T, n2: T) -> T {
     std::cmp::max_by(n1, n2, |a, b| {
@@ -28,7 +28,7 @@ const PIN_SPACING: f32 = (PIN_SIZE * 2.0) + 2.0;
 const PIN_SIZE: f32 = 5.0;
 const PIN_COLOR: Color = Color::GRAY;
 const PIN_LEN: f32 = PIN_SIZE + 2.0;
-const WIRE_THICKNES:f32 = 2.0;
+const WIRE_THICKNES: f32 = 2.0;
 fn calculate_comp_height(max_pins: usize) -> f32 {
     let height: f32 = (max_pins as f32 * PIN_SPACING) + MIN_OUTER_PADDING;
     max(height, MIN_COMP_SIZE)
@@ -42,10 +42,20 @@ fn calculate_pin_height(num_of_pins: usize, comp_height: f32) -> f32 {
     let skip = real_padding / 2.0;
     skip + (PIN_SIZE)
 }
+fn print_dyn(n: &Circuit, indent: usize) {
+    println!("{:indent$}{} {}", ' ', &n.header.name, &n.has_dynamic);
+    for comp in n
+        .components
+        .iter()
+        .filter(|c| c.node_type == NodeType::INTEGRATED_CIRCUIT)
+    {
+        let instance = comp.ic_instance.as_ref().unwrap();
+        print_dyn(instance, indent + 1);
+    }
+}
 impl State {
     pub fn new() -> Self {
-
-        let circ = include_str!("../sls/v3/7de475f0-1ff5-46c1-941c-dd4dd18f6224");
+        let circ = include_str!("../sls/v3/80b690db-35f6-4d4a-9686-c4a828c0307f");
         let mut n: sls::Circuit = serde_json::from_str(circ).unwrap();
         n.init_circ(None);
         let cam = Camera2D {
@@ -54,6 +64,8 @@ impl State {
             rotation: 0.0,
             zoom: 1.0,
         };
+        print_dyn(&n, 0);
+        n.has_dynamic = true;
         //calculate all positions of circuits
         let mut positions = HashMap::with_capacity(n.components.len());
         for (i, comp) in n.components.iter().enumerate() {
@@ -98,12 +110,13 @@ impl State {
             let scale = 0.2 * scroll;
             self.cam.zoom = (self.cam.zoom.ln() + scale).exp().clamp(0.125, 64.0);
         }
-        let real_count=rl.get_touch_point_count();
-        let touch_point_count = if real_count==0&&mouse { 1 } else { rl.get_touch_point_count() };
+        let real_count = rl.get_touch_point_count();
+        let touch_point_count = if real_count == 0 && mouse {
+            1
+        } else {
+            rl.get_touch_point_count()
+        };
         if touch_point_count == 1 {
-            if mouse {
-                println!("Mouse");
-            }
             let current = rl.get_screen_to_world2D(
                 if mouse {
                     rl.get_mouse_position()
@@ -161,7 +174,7 @@ impl State {
             }
         }
         match touch_point_count {
-            1|2 => {
+            1 | 2 => {
                 self.last = Some(rl.get_touch_position(0));
             }
             _ => {
@@ -184,12 +197,17 @@ impl State {
         if rl.is_key_pressed(KeyboardKey::KEY_F) {
             rl.toggle_fullscreen();
         }
-        self.circuit.tick();
+        let t = rl.get_time();
+        let tick_sec = 0.100;
+        let times = t - (self.circuit.tick_count as f64 * tick_sec);
+        for _ in 0..((times / tick_sec) as usize) {
+            self.circuit.tick();
+        }
     }
     pub fn draw(&mut self) {
-        const BUTTON_BORDER:f32 = 5.0;
-        const LABEL_SIZE:i32 = 24;
-        const NOTE_SIZE:i32 = 48;
+        const BUTTON_BORDER: f32 = 5.0;
+        const LABEL_SIZE: i32 = 24;
+        const NOTE_SIZE: i32 = 48;
 
         let rl = self.rl.as_mut().unwrap();
         let t = self.t.as_ref().unwrap();
@@ -213,7 +231,7 @@ impl State {
                     sls::NodeType::PULSE_BUTTON => {
                         let b: bool = comp.outputs[0];
                         let color = if b { Color::DARKRED } else { Color::RED };
-                        const BUTTON_RADIUS:f32 = MIN_COMP_SIZE/2.0;
+                        const BUTTON_RADIUS: f32 = MIN_COMP_SIZE / 2.0;
                         let pos = Vector2::new(comp.x + BUTTON_RADIUS, comp.y + BUTTON_RADIUS);
                         draw.draw_circle_v(pos, BUTTON_RADIUS, Color::ORANGE);
                         draw.draw_circle_v(pos, BUTTON_RADIUS - BUTTON_BORDER, color);
@@ -222,31 +240,36 @@ impl State {
                         let b: bool = comp.outputs[0];
                         let color = if b { Color::DARKRED } else { Color::RED };
                         let pos = Vector2::new(comp.x, comp.y);
-                        draw.draw_rectangle_v(pos, Vector2::new(MIN_COMP_SIZE, MIN_COMP_SIZE), Color::ORANGE);
+                        draw.draw_rectangle_v(
+                            pos,
+                            Vector2::new(MIN_COMP_SIZE, MIN_COMP_SIZE),
+                            Color::ORANGE,
+                        );
                         let pos = Vector2::new(comp.x + BUTTON_BORDER, comp.y + BUTTON_BORDER);
-                        draw.draw_rectangle_v(pos, Vector2::new(MIN_COMP_SIZE - (BUTTON_BORDER*2.0), MIN_COMP_SIZE - (BUTTON_BORDER*2.0)), color);
+                        draw.draw_rectangle_v(
+                            pos,
+                            Vector2::new(
+                                MIN_COMP_SIZE - (BUTTON_BORDER * 2.0),
+                                MIN_COMP_SIZE - (BUTTON_BORDER * 2.0),
+                            ),
+                            color,
+                        );
                     }
                     sls::NodeType::NOTE => {
-                        let text:&str = &comp.text.as_ref().expect("text field of NODE");
+                        let text: &str = &comp.text.as_ref().expect("text field of NODE");
                         draw.draw_text(text, comp.x as i32, comp.y as i32, NOTE_SIZE, Color::BLACK);
                     }
                     _ => {
                         let color = if let Some(ic) = &comp.ic_instance {
-                            match ic.header.color{
-                                Some(c) => {
-                                    Color::new(c.r, c.g, c.b, 255)
-                                }
-                                None => {
-                                    Color::GRAY
-                                }
-                            } 
-                        } else {Color::GRAY};
+                            match ic.header.color {
+                                Some(c) => Color::new(c.r, c.g, c.b, 255),
+                                None => Color::GRAY,
+                            }
+                        } else {
+                            Color::GRAY
+                        };
                         let pos = Vector2::new(comp.x, comp.y);
-                        draw.draw_rectangle_v(
-                            pos,
-                            Vector2::new(MIN_COMP_SIZE, to_height),
-                            color,
-                        );
+                        draw.draw_rectangle_v(pos, Vector2::new(MIN_COMP_SIZE, to_height), color);
                     }
                 }
                 if let Some(label) = &comp.label {
@@ -269,13 +292,15 @@ impl State {
                 for i in 0..to_num_in {
                     let pin_pos =
                         Vector2::new(comp.x - PIN_LEN, to_in_y + (PIN_SPACING * i as f32));
-                    let pin_pos_line =
-                        Vector2::new(comp.x - PIN_LEN + PIN_SIZE, to_in_y + (PIN_SPACING * i as f32));
+                    let pin_pos_line = Vector2::new(
+                        comp.x - PIN_LEN + PIN_SIZE,
+                        to_in_y + (PIN_SPACING * i as f32),
+                    );
                     let comp_pos = Vector2::new(comp.x, to_in_y + (PIN_SPACING * i as f32));
                     draw.draw_line_ex(pin_pos_line, comp_pos, WIRE_THICKNES, PIN_COLOR);
                     draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                 }
-                if comp.node_type!=NodeType::LIGHT_BULB {
+                if comp.node_type != NodeType::LIGHT_BULB {
                     for i in 0..to_num_out {
                         let pin_pos = Vector2::new(
                             comp.x + PIN_LEN + MIN_COMP_SIZE,
@@ -285,8 +310,10 @@ impl State {
                             comp.x + PIN_LEN + MIN_COMP_SIZE - PIN_SIZE,
                             to_out_y + (PIN_SPACING * i as f32),
                         );
-                        let comp_pos =
-                        Vector2::new(comp.x + MIN_COMP_SIZE, to_out_y + (PIN_SPACING * i as f32));
+                        let comp_pos = Vector2::new(
+                            comp.x + MIN_COMP_SIZE,
+                            to_out_y + (PIN_SPACING * i as f32),
+                        );
                         draw.draw_line_ex(pin_pos_line, comp_pos, WIRE_THICKNES, PIN_COLOR);
                         draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                     }
