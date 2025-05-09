@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::time::Instant;
 
-use raylib::core::math::Vector2;
 use raylib::prelude::*;
+use raylib::core::math::Vector2;
 use raylib::{camera::Camera2D, color::Color, ffi::Gesture, RaylibHandle};
 use slslib::sls::{self, Circuit, NodeType, ID};
 
@@ -11,16 +10,25 @@ fn max<T: PartialOrd>(n1: T, n2: T) -> T {
         a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
     })
 }
-
+enum ZoomStyle {
+    Point1,
+    Mid,
+}
+struct Settings {
+    zoom_style: ZoomStyle,
+}
 pub struct State {
     pub rl: Option<raylib::core::RaylibHandle>,
     pub t: Option<raylib::RaylibThread>,
     circuit: sls::Circuit,
     cam: Camera2D,
     last: Option<Vector2>,
-    last_two: Option<(Vector2, Vector2)>,
     comp_indexes: HashMap<ID, usize>, //components index
-    pinch: Option<Vector2>,
+    drag_start:Option<Vector2>,
+    initial_distance: f32,
+    initial_zoom: f32,
+    initial_origin: Vector2,
+    settings: Settings,
 }
 const MIN_COMP_SIZE: f32 = 50.0;
 const MIN_OUTER_PADDING: f32 = PIN_SIZE + 5.0;
@@ -55,7 +63,7 @@ fn print_dyn(n: &Circuit, indent: usize) {
 }
 impl State {
     pub fn new() -> Self {
-        let circ = include_str!("../sls/v3/80b690db-35f6-4d4a-9686-c4a828c0307f");
+        let circ = include_str!("../sls/v3/6db39f2f-acb0-4462-9759-eb52e913d996");
         let mut n: sls::Circuit = serde_json::from_str(circ).unwrap();
         n.init_circ(None);
         let cam = Camera2D {
@@ -87,9 +95,12 @@ impl State {
             circuit: n,
             cam,
             last: None,
-            last_two: None,
             comp_indexes: positions,
-            pinch: None,
+            drag_start:None,
+            initial_distance: 0.0,
+            initial_zoom: 1.0,
+            initial_origin: Vector2::zero(),
+            settings: Settings { zoom_style: ZoomStyle::Mid },
         }
     }
     pub fn update(&mut self) {
@@ -100,8 +111,19 @@ impl State {
         }
         let mouse = rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT);
         let scroll = rl.get_mouse_wheel_move();
+        let mouse_pos = rl.get_mouse_position();
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            self.drag_start=Some(mouse_pos);
+        }
+        if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
+            self.drag_start=None;
+        }
+        if let Some(drag) = self.drag_start.as_mut() {
+            let delta = *drag-mouse_pos;
+            self.cam.target += delta.scale_by(1.0/self.cam.zoom);
+            *drag = rl.get_mouse_position();
+        }
         if scroll != 0.0 {
-            let mouse_pos = rl.get_mouse_position();
             let world_pos = rl.get_screen_to_world2D(mouse_pos, self.cam);
             self.cam.offset = mouse_pos;
             self.cam.target = world_pos;
@@ -110,6 +132,35 @@ impl State {
             let scale = 0.2 * scroll;
             self.cam.zoom = (self.cam.zoom.ln() + scale).exp().clamp(0.125, 64.0);
         }
+        if rl.get_touch_point_count()>=2 {
+            let p1 = rl.get_touch_position(0);
+            let p2 = rl.get_touch_position(1);
+            //average
+            let origin = match self.settings.zoom_style {
+                ZoomStyle::Mid => (p1+p2).scale_by(0.5),
+                ZoomStyle::Point1 => p1,
+            };
+            let world_mid_before = rl.get_screen_to_world2D(origin, self.cam);
+
+            let current_distance = p1.distance_to(p2);
+
+            if self.initial_distance==0.0 {
+                self.initial_distance = current_distance;
+                self.initial_zoom = self.cam.zoom;
+                self.initial_origin = world_mid_before;
+            }
+            let zoom_factor = current_distance / self.initial_distance;
+            self.cam.zoom = self.initial_zoom * zoom_factor;
+
+            //recenter to origin
+            let world_origin_after = rl.get_screen_to_world2D(origin, self.cam);
+            let offset = self.initial_origin - world_origin_after;
+            self.cam.target+=offset;
+        } else {
+            self.initial_distance=0.0;
+        }
+
+
         let real_count = rl.get_touch_point_count();
         let touch_point_count = if real_count == 0 && mouse {
             1
@@ -125,10 +176,7 @@ impl State {
                 },
                 self.cam,
             );
-            if let Some(last) = self.last {
-                let last = rl.get_screen_to_world2D(last, self.cam);
-                self.cam.target.x -= current.x - last.x;
-                self.cam.target.y -= current.y - last.y;
+            if self.last.is_none() {
                 for i in self.circuit.inputs.iter() {
                     let comp = &mut self.circuit.components[*i];
                     if current.x >= comp.x
@@ -141,7 +189,6 @@ impl State {
                         }
                     }
                 }
-            } else {
                 //check for button press
                 for i in self.circuit.inputs.iter() {
                     let comp = &mut self.circuit.components[*i];
@@ -156,7 +203,7 @@ impl State {
                     }
                 }
             }
-        } else {
+        } else if touch_point_count==0 {
             if let Some(last) = self.last {
                 let last = rl.get_screen_to_world2D(last, self.cam);
                 for i in self.circuit.inputs.iter() {
@@ -174,31 +221,18 @@ impl State {
             }
         }
         match touch_point_count {
-            1 | 2 => {
+            1 => {
                 self.last = Some(rl.get_touch_position(0));
             }
             _ => {
                 self.last = None;
             }
         }
-        if rl.is_gesture_detected(Gesture::GESTURE_PINCH_IN)
-            || rl.is_gesture_detected(Gesture::GESTURE_PINCH_OUT)
-        {
-            let pinch = rl.get_gesture_pinch_vector();
-            if let Some(last) = self.pinch {
-                let diff = pinch.length() - last.length();
-                //let middle_x = rl.get_touch_x() + pinch.x;
-                self.cam.zoom += diff;
-            }
-            self.pinch = Some(pinch);
-        } else {
-            self.pinch = None;
-        }
         if rl.is_key_pressed(KeyboardKey::KEY_F) {
             rl.toggle_fullscreen();
         }
         let t = rl.get_time();
-        let tick_sec = 0.100;
+        let tick_sec = 0.001;
         let times = t - (self.circuit.tick_count as f64 * tick_sec);
         for _ in 0..((times / tick_sec) as usize) {
             self.circuit.tick();
@@ -341,10 +375,14 @@ impl State {
             }
         }
         draw.draw_fps(0, 0);
-        let tp1 = draw.get_touch_position(0);
-        let tp2 = draw.get_touch_position(1);
-        draw.draw_circle_v(tp1, 5.0, Color::PINK);
-        draw.draw_circle_v(tp2, 5.0, Color::PURPLE);
+        if draw.get_touch_point_count()>=2 {
+            let tp1 = draw.get_touch_position(0);
+            let tp2 = draw.get_touch_position(1);
+            //draw.draw_circle_v(tp1, 5.0, Color::PINK);
+            //draw.draw_circle_v(tp2, 5.0, Color::PURPLE);
+            let mid = (tp1+tp2).scale_by(0.5);
+            draw.draw_circle_v(mid, 2.0, Color::BLUE);
+        }
 
         //draw.gui_window_box(
         //    Rectangle::new(0.0, 0.0, 70.0, 70.0),
