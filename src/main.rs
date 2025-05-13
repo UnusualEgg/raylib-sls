@@ -34,14 +34,9 @@ extern "C" fn draw_loop() {
     state.update();
     state.draw();
 
-    let rl: &RaylibHandle = state.rl.as_ref().unwrap();
-    if rl.is_key_pressed(KeyboardKey::KEY_ESCAPE) {
-        println!("Goodbye!");
-        unsafe {
-            SHOULD_EXIT=true;
-        }
-    }
+    let rl: &RaylibHandle = &state.rl;
     if rl.window_should_close() {
+        println!("bye. window_should_close");
         unsafe {
             SHOULD_EXIT=true;
         }
@@ -50,9 +45,8 @@ extern "C" fn draw_loop() {
 
 fn main() {
     println!("Hewroo world :3!");
-    unsafe {
-        STATE.write(State::new());
-    }
+    unsafe {&mut STATE}.write(State::new());
+    
     #[cfg(target_family = "wasm")]
     emscripten::set_main_loop(draw_loop, 0, false);
 

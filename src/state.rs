@@ -18,8 +18,8 @@ struct Settings {
     zoom_style: ZoomStyle,
 }
 pub struct State {
-    pub rl: Option<raylib::core::RaylibHandle>,
-    pub t: Option<raylib::RaylibThread>,
+    pub rl: raylib::core::RaylibHandle,
+    pub t: raylib::RaylibThread,
     circuit: sls::Circuit,
     cam: Camera2D,
     last: Option<Vector2>,
@@ -79,19 +79,20 @@ impl State {
         for (i, comp) in n.components.iter().enumerate() {
             positions.insert(comp.get_id().clone(), i);
         }
-        let (rl, t) = raylib::init()
+        let (mut rl, t) = raylib::init()
             .size(400, 400)
             .title("Hello World")
             .resizable()
             .build();
+        rl.set_exit_key(Some(KeyboardKey::KEY_ESCAPE));
         rl.set_gestures_enabled(
             Gesture::GESTURE_TAP as u32
                 | Gesture::GESTURE_PINCH_OUT as u32
                 | Gesture::GESTURE_PINCH_IN as u32,
         );
         State {
-            rl: Some(rl),
-            t: Some(t),
+            rl,
+            t,
             circuit: n,
             cam,
             last: None,
@@ -104,7 +105,14 @@ impl State {
         }
     }
     pub fn update(&mut self) {
-        let rl: &mut RaylibHandle = self.rl.as_mut().unwrap();
+        let rl: &mut RaylibHandle = &mut self.rl;
+        if rl.is_key_pressed(KeyboardKey::KEY_F) {
+            rl.toggle_fullscreen();
+            if !rl.is_window_fullscreen() {
+                rl.set_window_size(400, 400);
+            }
+            println!("now {} {}",rl.get_render_width(),rl.get_render_height());
+        }
         if rl.is_window_resized() {
             self.cam.offset.x = rl.get_render_width() as f32 / 2.0;
             self.cam.offset.y = rl.get_render_height() as f32 / 2.0;
@@ -228,9 +236,6 @@ impl State {
                 self.last = None;
             }
         }
-        if rl.is_key_pressed(KeyboardKey::KEY_F) {
-            rl.toggle_fullscreen();
-        }
         let t = rl.get_time();
         let tick_sec = 0.001;
         let times = t - (self.circuit.tick_count as f64 * tick_sec);
@@ -243,8 +248,8 @@ impl State {
         const LABEL_SIZE: i32 = 24;
         const NOTE_SIZE: i32 = 48;
 
-        let rl = self.rl.as_mut().unwrap();
-        let t = self.t.as_ref().unwrap();
+        let rl = &mut self.rl;
+        let t = &self.t;
         let mut draw = rl.begin_drawing(t);
         draw.clear_background(Color::RAYWHITE);
         {
@@ -391,4 +396,3 @@ impl State {
         //draw.gui_label(Rectangle::new(0.0, 50.0, 50.0, 20.0), Some(c"ewwo world"));
     }
 }
-unsafe impl Send for State {}
