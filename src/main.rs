@@ -51,12 +51,14 @@ fn main() {
     emscripten::set_main_loop(draw_loop, 0, false);
 
     #[cfg(not(target_family = "wasm"))]
-    while !unsafe{SHOULD_EXIT} {
-        draw_loop();
-    }
-    //drop STATE
-    unsafe {
-        STATE.assume_init_drop();
+    {
+        while !unsafe{SHOULD_EXIT} {
+            draw_loop();
+        }
+        //drop STATE
+        unsafe {
+            STATE.assume_init_drop();
+        }
     }
     println!("end of main!");
 }
