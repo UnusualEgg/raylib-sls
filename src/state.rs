@@ -73,7 +73,7 @@ fn print_dyn(n: &Circuit, indent: usize) {
 }
 impl State {
     pub fn new() -> Self {
-        let circ = include_str!("../sls/v3/6db39f2f-acb0-4462-9759-eb52e913d996");
+        let circ = include_str!("../sls/programmable-processor-8-bit-v3.slj");
         let mut n: sls::Circuit = serde_json::from_str(circ).unwrap();
         n.init_circ(None);
         let cam = Camera2D {
@@ -82,7 +82,7 @@ impl State {
             rotation: 0.0,
             zoom: 1.0,
         };
-        print_dyn(&n, 0);
+        //print_dyn(&n, 0);
         n.has_dynamic = true;
         let (mut rl, t) = raylib::init()
             .size(400, 400)
@@ -143,6 +143,7 @@ impl State {
             }
             comp_inputs.push(inputs);
         }
+        println!("init done!");
         State {
             rl,
             t,
@@ -221,7 +222,6 @@ impl State {
             if !self.rl.is_window_fullscreen() {
                 self.rl.set_window_size(400, 400);
             }
-            println!("now {} {}",self.rl.get_render_width(),self.rl.get_render_height());
         }
         if self.rl.is_window_resized() {
             self.cam.offset.x = self.rl.get_render_width() as f32 / 2.0;
@@ -391,7 +391,7 @@ impl State {
                     }
                 }
                 for input in &self.comp_inputs[comp_i] {
-                    let on = comp.input_states[input.other_pin].state;
+                    let on = match comp.input_states.get(input.in_pin){Some(s)=>s.state,None=>false};
                     const ON_COLOR: Color = Color::GREEN;
                     const OFF_COLOR: Color = Color::BLACK;
                     let color = if on { ON_COLOR } else { OFF_COLOR };
