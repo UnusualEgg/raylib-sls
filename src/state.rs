@@ -17,6 +17,12 @@ enum ZoomStyle {
 struct Settings {
     zoom_style: ZoomStyle,
 }
+//all indexes
+struct CompInput {
+    in_pin: usize,
+    other_pin: usize,
+    other_comp: usize,
+}
 pub struct State {
     pub rl: raylib::core::RaylibHandle,
     pub t: raylib::RaylibThread,
@@ -24,8 +30,10 @@ pub struct State {
     cam: Camera2D,
     last: Option<Vector2>,
     pointer_on_button:bool,
-    comp_indexes: HashMap<ID, usize>, //components index
     comp_labels: Vec<String>,
+    in_pin_pos: Vec<Vec<Vector2>>,
+    out_pin_pos: Vec<Vec<Vector2>>,
+    comp_inputs: Vec<Vec<CompInput>>,
     drag_start:Option<Vector2>,
     initial_distance: f32,
     initial_zoom: f32,
@@ -76,11 +84,6 @@ impl State {
         };
         print_dyn(&n, 0);
         n.has_dynamic = true;
-        //calculate all positions of circuits
-        let mut positions = HashMap::with_capacity(n.components.len());
-        for (i, comp) in n.components.iter().enumerate() {
-            positions.insert(comp.get_id().clone(), i);
-        }
         let (mut rl, t) = raylib::init()
             .size(400, 400)
             .title("Hello World")
@@ -103,13 +106,49 @@ impl State {
                 },
             });
         }
+        let mut in_pin_pos:Vec<Vec<Vector2>> = Vec::with_capacity(n.components.len());
+        let mut out_pin_pos:Vec<Vec<Vector2>> = Vec::with_capacity(n.components.len());
+        for comp in &n.components {
+            let to_num_in = comp.input_states.len();
+            let to_num_out = comp.outputs.len();
+            let to_height = calculate_comp_height(max(to_num_in, to_num_out));
+            let to_in_y_offset = calculate_pin_height(to_num_in, to_height);
+            let to_in_y = comp.y + to_in_y_offset;
+            let to_out_y_offset = calculate_pin_height(to_num_out, to_height);
+            let to_out_y = comp.y + to_out_y_offset;
+            let mut in_pin = Vec::with_capacity(to_num_in);
+            for i in 0..to_num_in {
+                let pin_pos =
+                    Vector2::new(comp.x - PIN_LEN, to_in_y + (PIN_SPACING * i as f32));
+                in_pin.push(pin_pos);
+            }
+            in_pin_pos.push(in_pin);
+            let mut out_pin = Vec::with_capacity(to_num_out);
+            for i in 0..to_num_out {
+                let pin_pos =
+                    Vector2::new(comp.x + MIN_COMP_SIZE + PIN_LEN, to_out_y + (PIN_SPACING * i as f32));
+                out_pin.push(pin_pos);
+            }
+            out_pin_pos.push(out_pin);
+        }
+        let mut comp_inputs = Vec::with_capacity(n.components.len());
+        for comp in &n.components {
+            let mut inputs = Vec::with_capacity(comp.inputs.len());
+            for input in &comp.inputs {
+                inputs.push(CompInput {
+                    in_pin: input.in_pin,
+                    other_pin: input.other_pin,
+                    other_comp: n.components.iter().enumerate().find(|(_,n)|n.get_id()==&input.other_id).unwrap().0
+                });
+            }
+            comp_inputs.push(inputs);
+        }
         State {
             rl,
             t,
             circuit: n,
             cam,
             last: None,
-            comp_indexes: positions,
             drag_start:None,
             initial_distance: 0.0,
             initial_zoom: 1.0,
@@ -117,6 +156,9 @@ impl State {
             settings: Settings { zoom_style: ZoomStyle::Mid },
             pointer_on_button: false,
             comp_labels: labels,
+            in_pin_pos,
+            out_pin_pos,
+            comp_inputs,
         }
     }
     fn update_zoom(&mut self,mouse_pos:Vector2) {
@@ -348,25 +390,12 @@ impl State {
                         draw.draw_circle_lines_v(pin_pos, PIN_SIZE, PIN_COLOR);
                     }
                 }
-                for input in &comp.inputs {
-                    let from: &slslib::sls::Component = self
-                        .circuit
-                        .components
-                        .get(*self.comp_indexes.get(&input.other_id).unwrap())
-                        .unwrap();
-                    let from_num_in = from.input_states.len();
-                    let from_num_out = from.outputs.len();
-                    let from_height = calculate_comp_height(max(from_num_in, from_num_out));
-                    let from_y_off = calculate_pin_height(from_num_out, from_height);
-                    let y_from = from.y + from_y_off + (input.other_pin as f32 * PIN_SPACING);
-                    let from_vec = Vector2::new(from.x + MIN_COMP_SIZE + PIN_LEN, y_from);
-                    let y_to = comp.y + to_in_y_offset + (input.in_pin as f32 * PIN_SPACING);
-                    let to_vec = Vector2::new(comp.x - PIN_LEN, y_to);
-                    let on = from.outputs[input.other_pin];
+                for input in &self.comp_inputs[comp_i] {
+                    let on = comp.input_states[input.other_pin].state;
                     const ON_COLOR: Color = Color::GREEN;
                     const OFF_COLOR: Color = Color::BLACK;
                     let color = if on { ON_COLOR } else { OFF_COLOR };
-                    draw.draw_line_ex(from_vec, to_vec, WIRE_THICKNES, color);
+                    draw.draw_line_ex(self.out_pin_pos[input.other_comp][input.other_pin], self.in_pin_pos[comp_i][input.in_pin], WIRE_THICKNES, color);
                 }
             }
         }
