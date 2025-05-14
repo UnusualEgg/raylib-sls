@@ -23,6 +23,7 @@ pub struct State {
     circuit: sls::Circuit,
     cam: Camera2D,
     last: Option<Vector2>,
+    pointer_on_button:bool,
     comp_indexes: HashMap<ID, usize>, //components index
     drag_start:Option<Vector2>,
     initial_distance: f32,
@@ -103,6 +104,7 @@ impl State {
             initial_zoom: 1.0,
             initial_origin: Vector2::zero(),
             settings: Settings { zoom_style: ZoomStyle::Mid },
+            pointer_on_button: false,
         }
     }
     fn update_zoom(&mut self,mouse_pos:Vector2) {
@@ -160,28 +162,23 @@ impl State {
         }
     }
     pub fn update(&mut self) {
-        let rl: &mut RaylibHandle = &mut self.rl;
-        if rl.is_key_pressed(KeyboardKey::KEY_F) {
-            rl.toggle_fullscreen();
-            if !rl.is_window_fullscreen() {
-                rl.set_window_size(400, 400);
+        if self.rl.is_key_pressed(KeyboardKey::KEY_F) {
+            self.rl.toggle_fullscreen();
+            if !self.rl.is_window_fullscreen() {
+                self.rl.set_window_size(400, 400);
             }
-            println!("now {} {}",rl.get_render_width(),rl.get_render_height());
+            println!("now {} {}",self.rl.get_render_width(),self.rl.get_render_height());
         }
-        if rl.is_window_resized() {
-            self.cam.offset.x = rl.get_render_width() as f32 / 2.0;
-            self.cam.offset.y = rl.get_render_height() as f32 / 2.0;
+        if self.rl.is_window_resized() {
+            self.cam.offset.x = self.rl.get_render_width() as f32 / 2.0;
+            self.cam.offset.y = self.rl.get_render_height() as f32 / 2.0;
         }
-        let mouse_pos = rl.get_mouse_position();
-        _=rl;
-        self.update_drag(mouse_pos);
-        self.update_zoom(mouse_pos);
-        let rl = &mut self.rl;
+        let mouse_pos = self.rl.get_mouse_position();
 
 
-        if rl.is_gesture_detected(Gesture::GESTURE_TAP) {
-            let current = rl.get_screen_to_world2D(
-                rl.get_mouse_position(),
+        if self.rl.is_gesture_detected(Gesture::GESTURE_TAP) {
+            let current = self.rl.get_screen_to_world2D(
+                self.rl.get_mouse_position(),
                 self.cam,
             );
             for i in self.circuit.inputs.iter() {
@@ -190,14 +187,16 @@ impl State {
                 if comp_rect.check_collision_point_rec(current) {
                     if comp.node_type == NodeType::PULSE_BUTTON {
                         comp.next_outputs[0] = true;
+                        self.pointer_on_button = true;
                     } else if comp.node_type == NodeType::TOGGLE_BUTTON {
                         comp.next_outputs[0] = !comp.next_outputs[0];
+                        self.pointer_on_button = true;
                     }
                 }
             }
 
             self.last=Some(current);
-        } else if !rl.is_gesture_detected(Gesture::GESTURE_HOLD){
+        } else if self.rl.is_mouse_button_up(MouseButton::MOUSE_BUTTON_LEFT) {
             if let Some(last) = self.last {
                 for i in self.circuit.inputs.iter() {
                     let comp = &mut self.circuit.components[*i];
@@ -205,13 +204,19 @@ impl State {
                     if comp_rect.check_collision_point_rec(last) {
                         if comp.node_type == NodeType::PULSE_BUTTON {
                             comp.next_outputs[0] = false;
+                            self.pointer_on_button = false;
                         }
                     }
                 }
             }
+            self.pointer_on_button=false;
             self.last=None;
         }
-        let t = rl.get_time();
+        if !self.pointer_on_button {
+            self.update_drag(mouse_pos);
+            self.update_zoom(mouse_pos);
+        }
+        let t = self.rl.get_time();
         let tick_sec = 0.001;
         let times = t - (self.circuit.tick_count as f64 * tick_sec);
         for _ in 0..((times / tick_sec) as usize) {
