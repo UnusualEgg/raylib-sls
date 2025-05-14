@@ -25,6 +25,7 @@ pub struct State {
     last: Option<Vector2>,
     pointer_on_button:bool,
     comp_indexes: HashMap<ID, usize>, //components index
+    comp_labels: Vec<String>,
     drag_start:Option<Vector2>,
     initial_distance: f32,
     initial_zoom: f32,
@@ -92,6 +93,16 @@ impl State {
                 | Gesture::GESTURE_PINCH_OUT as u32
                 | Gesture::GESTURE_PINCH_IN as u32,
         );
+        let mut labels = Vec::with_capacity(n.components.len());
+        for comp in &n.components {
+            labels.push(match comp.label.as_ref() {
+                Some(l) => l.clone(),
+                None => match comp.node_type {
+                    NodeType::NOTE => "".to_string(),
+                    _ => comp.node_type.to_string(),
+                },
+            });
+        }
         State {
             rl,
             t,
@@ -105,6 +116,7 @@ impl State {
             initial_origin: Vector2::zero(),
             settings: Settings { zoom_style: ZoomStyle::Mid },
             pointer_on_button: false,
+            comp_labels: labels,
         }
     }
     fn update_zoom(&mut self,mouse_pos:Vector2) {
@@ -235,7 +247,7 @@ impl State {
         {
             let mut draw = draw.begin_mode2D(self.cam);
             draw.draw_circle(0, 0, 50.0, Color::PINK);
-            for comp in &self.circuit.components {
+            for (comp_i, comp) in self.circuit.components.iter().enumerate() {
                 let to_num_in = comp.input_states.len();
                 let to_num_out = comp.outputs.len();
                 let to_height = calculate_comp_height(max(to_num_in, to_num_out));
@@ -291,16 +303,15 @@ impl State {
                         draw.draw_rectangle_v(pos, Vector2::new(MIN_COMP_SIZE, to_height), color);
                     }
                 }
-                if let Some(label) = &comp.label {
-                    let size = draw.measure_text(label, LABEL_SIZE);
-                    draw.draw_text(
-                        label,
-                        (comp.x + (MIN_COMP_SIZE / 2.0)) as i32 - (size / 2),
-                        (comp.y + to_height) as i32,
-                        LABEL_SIZE,
-                        Color::BLACK,
-                    );
-                }
+                let label = &self.comp_labels[comp_i];
+                let size = draw.measure_text(label, LABEL_SIZE);
+                draw.draw_text(
+                    label,
+                    (comp.x + (MIN_COMP_SIZE / 2.0)) as i32 - (size / 2),
+                    (comp.y + to_height) as i32,
+                    LABEL_SIZE,
+                    Color::BLACK,
+                );
                 //draw wires
                 //wire goes *from* one component *to* this component
                 //plus components have *in*put pins and *out*put pins
