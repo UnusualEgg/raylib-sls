@@ -295,7 +295,7 @@ impl State {
                         );
                     }
                     sls::NodeType::NOTE => {
-                        let text: &str = &comp.text.as_ref().expect("text field of NODE");
+                        let text: &str = comp.text.as_ref().expect("text field of NODE");
                         draw.draw_text(text, comp.x as i32, comp.y as i32, NOTE_SIZE, Color::BLACK);
                     }
                     _ => {
@@ -358,7 +358,7 @@ impl State {
                     }
                 }
                 for input in &comp.inputs {
-                    let from: &slslib::sls::Component = &self
+                    let from: slslib::sls::Component = &self
                         .circuit
                         .components
                         .get(*self.comp_indexes.get(&input.other_id).unwrap())
