@@ -96,7 +96,7 @@ impl State {
                 | Gesture::GESTURE_PINCH_OUT as u32
                 | Gesture::GESTURE_PINCH_IN as u32,
         );
-        let mut labels = Vec::with_capacity(n.components.len());
+        let mut labels:Vec<String> = Vec::with_capacity(n.components.len());
         for comp in &n.components {
             labels.push(match comp.label.as_ref() {
                 Some(l) => l.clone(),
@@ -109,7 +109,7 @@ impl State {
         let mut in_pin_pos:Vec<Vec<Vector2>> = Vec::with_capacity(n.components.len());
         let mut out_pin_pos:Vec<Vec<Vector2>> = Vec::with_capacity(n.components.len());
         for comp in &n.components {
-            let to_num_in = comp.input_states.len();
+            let to_num_in = sls::get_num_inputs(comp);
             let to_num_out = comp.outputs.len();
             let to_height = calculate_comp_height(max(to_num_in, to_num_out));
             let to_in_y_offset = calculate_pin_height(to_num_in, to_height);
@@ -290,7 +290,7 @@ impl State {
             let mut draw = draw.begin_mode2D(self.cam);
             draw.draw_circle(0, 0, 50.0, Color::PINK);
             for (comp_i, comp) in self.circuit.components.iter().enumerate() {
-                let to_num_in = comp.input_states.len();
+                let to_num_in = sls::get_num_inputs(comp);
                 let to_num_out = comp.outputs.len();
                 let to_height = calculate_comp_height(max(to_num_in, to_num_out));
                 match comp.node_type {
@@ -391,7 +391,7 @@ impl State {
                     }
                 }
                 for input in &self.comp_inputs[comp_i] {
-                    let on = match comp.input_states.get(input.in_pin){Some(s)=>s.state,None=>false};
+                    let on = match comp.input_states.get(input.in_pin){Some(s)=>*s,None=>panic!("tried to get {} of {:#?}",&input.in_pin,comp)};
                     const ON_COLOR: Color = Color::GREEN;
                     const OFF_COLOR: Color = Color::BLACK;
                     let color = if on { ON_COLOR } else { OFF_COLOR };
