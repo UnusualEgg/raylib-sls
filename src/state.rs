@@ -86,7 +86,8 @@ impl State {
             .build();
         rl.set_exit_key(Some(KeyboardKey::KEY_ESCAPE));
         rl.set_gestures_enabled(
-            Gesture::GESTURE_TAP as u32
+            Gesture::GESTURE_HOLD as u32
+                | Gesture::GESTURE_TAP as u32
                 | Gesture::GESTURE_PINCH_OUT as u32
                 | Gesture::GESTURE_PINCH_IN as u32,
         );
@@ -104,33 +105,9 @@ impl State {
             settings: Settings { zoom_style: ZoomStyle::Mid },
         }
     }
-    pub fn update(&mut self) {
+    fn update_zoom(&mut self,mouse_pos:Vector2) {
         let rl: &mut RaylibHandle = &mut self.rl;
-        if rl.is_key_pressed(KeyboardKey::KEY_F) {
-            rl.toggle_fullscreen();
-            if !rl.is_window_fullscreen() {
-                rl.set_window_size(400, 400);
-            }
-            println!("now {} {}",rl.get_render_width(),rl.get_render_height());
-        }
-        if rl.is_window_resized() {
-            self.cam.offset.x = rl.get_render_width() as f32 / 2.0;
-            self.cam.offset.y = rl.get_render_height() as f32 / 2.0;
-        }
-        let mouse = rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT);
         let scroll = rl.get_mouse_wheel_move();
-        let mouse_pos = rl.get_mouse_position();
-        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            self.drag_start=Some(mouse_pos);
-        }
-        if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
-            self.drag_start=None;
-        }
-        if let Some(drag) = self.drag_start.as_mut() {
-            let delta = *drag-mouse_pos;
-            self.cam.target += delta.scale_by(1.0/self.cam.zoom);
-            *drag = rl.get_mouse_position();
-        }
         if scroll != 0.0 {
             let world_pos = rl.get_screen_to_world2D(mouse_pos, self.cam);
             self.cam.offset = mouse_pos;
@@ -167,6 +144,39 @@ impl State {
         } else {
             self.initial_distance=0.0;
         }
+    }
+    fn update_drag(&mut self,mouse_pos:Vector2) {
+        let rl = &mut self.rl;
+        if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
+            self.drag_start=Some(mouse_pos);
+        }
+        if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
+            self.drag_start=None;
+        }
+        if let Some(drag) = self.drag_start.as_mut() {
+            let delta = *drag-mouse_pos;
+            self.cam.target += delta.scale_by(1.0/self.cam.zoom);
+            *drag = mouse_pos;
+        }
+    }
+    pub fn update(&mut self) {
+        let rl: &mut RaylibHandle = &mut self.rl;
+        if rl.is_key_pressed(KeyboardKey::KEY_F) {
+            rl.toggle_fullscreen();
+            if !rl.is_window_fullscreen() {
+                rl.set_window_size(400, 400);
+            }
+            println!("now {} {}",rl.get_render_width(),rl.get_render_height());
+        }
+        if rl.is_window_resized() {
+            self.cam.offset.x = rl.get_render_width() as f32 / 2.0;
+            self.cam.offset.y = rl.get_render_height() as f32 / 2.0;
+        }
+        let mouse_pos = rl.get_mouse_position();
+        _=rl;
+        self.update_drag(mouse_pos);
+        self.update_zoom(mouse_pos);
+        let rl = &mut self.rl;
 
 
         if rl.is_gesture_detected(Gesture::GESTURE_TAP) {
@@ -176,11 +186,8 @@ impl State {
             );
             for i in self.circuit.inputs.iter() {
                 let comp = &mut self.circuit.components[*i];
-                if current.x >= comp.x
-                    && current.x <= comp.x + MIN_COMP_SIZE
-                    && current.y >= comp.y
-                    && current.y <= comp.y + MIN_COMP_SIZE
-                {
+                let comp_rect = raylib::math::Rectangle::new(comp.x, comp.y, MIN_COMP_SIZE, MIN_COMP_SIZE);
+                if comp_rect.check_collision_point_rec(current) {
                     if comp.node_type == NodeType::PULSE_BUTTON {
                         comp.next_outputs[0] = true;
                     } else if comp.node_type == NodeType::TOGGLE_BUTTON {
@@ -188,17 +195,14 @@ impl State {
                     }
                 }
             }
+
             self.last=Some(current);
-        } else {
+        } else if !rl.is_gesture_detected(Gesture::GESTURE_HOLD){
             if let Some(last) = self.last {
-                let last = rl.get_screen_to_world2D(last, self.cam);
                 for i in self.circuit.inputs.iter() {
                     let comp = &mut self.circuit.components[*i];
-                    if last.x >= comp.x
-                        && last.x <= comp.x + MIN_COMP_SIZE
-                        && last.y >= comp.y
-                        && last.y <= comp.y + MIN_COMP_SIZE
-                    {
+                    let comp_rect = raylib::math::Rectangle::new(comp.x, comp.y, MIN_COMP_SIZE, MIN_COMP_SIZE);
+                    if comp_rect.check_collision_point_rec(last) {
                         if comp.node_type == NodeType::PULSE_BUTTON {
                             comp.next_outputs[0] = false;
                         }
