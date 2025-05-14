@@ -169,49 +169,27 @@ impl State {
         }
 
 
-        let real_count = rl.get_touch_point_count();
-        let touch_point_count = if real_count == 0 && mouse {
-            1
-        } else {
-            rl.get_touch_point_count()
-        };
-        if touch_point_count == 1 {
+        if rl.is_gesture_detected(Gesture::GESTURE_TAP) {
             let current = rl.get_screen_to_world2D(
-                if mouse {
-                    rl.get_mouse_position()
-                } else {
-                    rl.get_touch_position(0)
-                },
+                rl.get_mouse_position(),
                 self.cam,
             );
-            if self.last.is_none() {
-                for i in self.circuit.inputs.iter() {
-                    let comp = &mut self.circuit.components[*i];
-                    if current.x >= comp.x
-                        && current.x <= comp.x + MIN_COMP_SIZE
-                        && current.y >= comp.y
-                        && current.y <= comp.y + MIN_COMP_SIZE
-                    {
-                        if comp.node_type == NodeType::PULSE_BUTTON {
-                            comp.next_outputs[0] = true;
-                        }
-                    }
-                }
-                //check for button press
-                for i in self.circuit.inputs.iter() {
-                    let comp = &mut self.circuit.components[*i];
-                    if current.x >= comp.x
-                        && current.x <= comp.x + MIN_COMP_SIZE
-                        && current.y >= comp.y
-                        && current.y <= comp.y + MIN_COMP_SIZE
-                    {
-                        if comp.node_type == NodeType::TOGGLE_BUTTON {
-                            comp.next_outputs[0] = !comp.next_outputs[0];
-                        }
+            for i in self.circuit.inputs.iter() {
+                let comp = &mut self.circuit.components[*i];
+                if current.x >= comp.x
+                    && current.x <= comp.x + MIN_COMP_SIZE
+                    && current.y >= comp.y
+                    && current.y <= comp.y + MIN_COMP_SIZE
+                {
+                    if comp.node_type == NodeType::PULSE_BUTTON {
+                        comp.next_outputs[0] = true;
+                    } else if comp.node_type == NodeType::TOGGLE_BUTTON {
+                        comp.next_outputs[0] = !comp.next_outputs[0];
                     }
                 }
             }
-        } else if touch_point_count==0 {
+            self.last=Some(current);
+        } else {
             if let Some(last) = self.last {
                 let last = rl.get_screen_to_world2D(last, self.cam);
                 for i in self.circuit.inputs.iter() {
@@ -227,14 +205,7 @@ impl State {
                     }
                 }
             }
-        }
-        match touch_point_count {
-            1 => {
-                self.last = Some(rl.get_touch_position(0));
-            }
-            _ => {
-                self.last = None;
-            }
+            self.last=None;
         }
         let t = rl.get_time();
         let tick_sec = 0.001;
@@ -358,7 +329,7 @@ impl State {
                     }
                 }
                 for input in &comp.inputs {
-                    let from: slslib::sls::Component = &self
+                    let from: &slslib::sls::Component = self
                         .circuit
                         .components
                         .get(*self.comp_indexes.get(&input.other_id).unwrap())
