@@ -1,4 +1,9 @@
 use std::collections::HashMap;
+use std::mem::ManuallyDrop;
+use std::sync::atomic::AtomicBool;
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 
 use raylib::prelude::*;
 use raylib::core::math::Vector2;
@@ -26,7 +31,7 @@ struct CompInput {
 pub struct State {
     pub rl: raylib::core::RaylibHandle,
     pub t: raylib::RaylibThread,
-    circuit: sls::Circuit,
+    circuit:  std::sync::Arc<std::sync::RwLock<sls::Circuit>>,
     cam: Camera2D,
     last: Option<Vector2>,
     pointer_on_button:bool,
@@ -39,6 +44,16 @@ pub struct State {
     initial_zoom: f32,
     initial_origin: Vector2,
     settings: Settings,
+    tick_rate:f64,
+    begin:Instant,
+    th:ManuallyDrop<JoinHandle<()>>,
+    should_exit:Arc<AtomicBool>,
+}
+impl Drop for State {
+    fn drop(&mut self) {
+        self.should_exit.store(true, std::sync::atomic::Ordering::Relaxed);
+        unsafe{std::mem::ManuallyDrop::drop(&mut self.th);}
+    }
 }
 const MIN_COMP_SIZE: f32 = 50.0;
 const MIN_OUTER_PADDING: f32 = PIN_SIZE + 5.0;
@@ -65,7 +80,7 @@ fn print_dyn(n: &Circuit, indent: usize) {
     for comp in n
         .components
         .iter()
-        .filter(|c| c.node_type == NodeType::INTEGRATED_CIRCUIT)
+        .filter(|c: &&sls::Component| c.node_type == NodeType::INTEGRATED_CIRCUIT)
     {
         let instance = comp.ic_instance.as_ref().unwrap();
         print_dyn(instance, indent + 1);
@@ -73,9 +88,10 @@ fn print_dyn(n: &Circuit, indent: usize) {
 }
 impl State {
     pub fn new() -> Self {
-        let circ = include_str!("../sls/programmable-processor-8-bit-v3.slj");
+        let circ = include_str!("../sls/v3/e4ef4756-d2cc-4915-83dc-dcb3fc4a412b");
         let mut n: sls::Circuit = serde_json::from_str(circ).unwrap();
         n.init_circ(None);
+        n.tick(true);
         let cam = Camera2D {
             offset: Vector2::new(200.0, 200.0),
             target: Vector2::zero(),
@@ -83,12 +99,13 @@ impl State {
             zoom: 1.0,
         };
         //print_dyn(&n, 0);
-        n.has_dynamic = true;
+        // n.has_dynamic = true;
         let (mut rl, t) = raylib::init()
             .size(400, 400)
             .title("Hello World")
             .resizable()
             .build();
+        rl.set_target_fps(60);
         rl.set_exit_key(Some(KeyboardKey::KEY_ESCAPE));
         rl.set_gestures_enabled(
             Gesture::GESTURE_HOLD as u32
@@ -143,11 +160,36 @@ impl State {
             }
             comp_inputs.push(inputs);
         }
+        let s = Arc::new(RwLock::new(n));
+        let s_t = Arc::clone(&s);
+        let should_exit = Arc::new(AtomicBool::new(false));
+        let should_exit_t = Arc::clone(&should_exit);
+        let th = std::thread::spawn(move || {
+            let mut begin:Instant = Instant::now();
+            let dur = Duration::from_secs_f64(1./(60.*2.));
+            loop {
+                {
+                    let mut s = s_t.write().unwrap();
+                    // while self.begin.elapsed().as_secs_f64()<self.tick_rate {
+                    s.tick(false);
+                    // }
+                }
+                let elapsed = begin.elapsed();
+                if elapsed<dur {
+                    std::thread::sleep(dur-elapsed);
+                }
+                begin=Instant::now();
+                if should_exit_t.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+            }
+            
+        });
         println!("init done!");
         State {
             rl,
             t,
-            circuit: n,
+            circuit: s,
             cam,
             last: None,
             drag_start:None,
@@ -160,6 +202,10 @@ impl State {
             in_pin_pos,
             out_pin_pos,
             comp_inputs,
+            tick_rate: 1.0/10.,
+            begin: Instant::now(),
+            th:ManuallyDrop::new(th),
+            should_exit
         }
     }
     fn update_zoom(&mut self,mouse_pos:Vector2) {
@@ -217,6 +263,8 @@ impl State {
         }
     }
     pub fn update(&mut self) {
+        
+
         if self.rl.is_key_pressed(KeyboardKey::KEY_F) {
             self.rl.toggle_fullscreen();
             if !self.rl.is_window_fullscreen() {
@@ -229,22 +277,26 @@ impl State {
         }
         let mouse_pos = self.rl.get_mouse_position();
 
-
+        
         if self.rl.is_gesture_detected(Gesture::GESTURE_TAP) {
+            let mut c=  self.circuit.write().unwrap();
             let current = self.rl.get_screen_to_world2D(
                 self.rl.get_mouse_position(),
                 self.cam,
             );
-            for i in self.circuit.inputs.iter() {
-                let comp = &mut self.circuit.components[*i];
+            for i in 0..c.inputs.len() {
+                let i = c.inputs[i];
+                let comp = &mut c.components[i];
                 let comp_rect = raylib::math::Rectangle::new(comp.x, comp.y, MIN_COMP_SIZE, MIN_COMP_SIZE);
                 if comp_rect.check_collision_point_rec(current) {
                     if comp.node_type == NodeType::PULSE_BUTTON {
                         comp.next_outputs[0] = true;
                         self.pointer_on_button = true;
+                        c.comps_changed=true;
                     } else if comp.node_type == NodeType::TOGGLE_BUTTON {
                         comp.next_outputs[0] = !comp.next_outputs[0];
                         self.pointer_on_button = true;
+                        c.comps_changed=true;
                     }
                 }
             }
@@ -252,13 +304,16 @@ impl State {
             self.last=Some(current);
         } else if self.rl.is_mouse_button_up(MouseButton::MOUSE_BUTTON_LEFT) {
             if let Some(last) = self.last {
-                for i in self.circuit.inputs.iter() {
-                    let comp = &mut self.circuit.components[*i];
+                let mut c=  self.circuit.write().unwrap();
+                for i in 0..c.inputs.len() {
+                    let i = c.inputs[i];
+                    let comp = &mut c.components[i];
                     let comp_rect = raylib::math::Rectangle::new(comp.x, comp.y, MIN_COMP_SIZE, MIN_COMP_SIZE);
                     if comp_rect.check_collision_point_rec(last) {
                         if comp.node_type == NodeType::PULSE_BUTTON {
                             comp.next_outputs[0] = false;
                             self.pointer_on_button = false;
+                            c.comps_changed=true;
                         }
                     }
                 }
@@ -269,12 +324,6 @@ impl State {
         if !self.pointer_on_button {
             self.update_drag(mouse_pos);
             self.update_zoom(mouse_pos);
-        }
-        let t = self.rl.get_time();
-        let tick_sec = 0.001;
-        let times = t - (self.circuit.tick_count as f64 * tick_sec);
-        for _ in 0..((times / tick_sec) as usize) {
-            self.circuit.tick();
         }
     }
     pub fn draw(&mut self) {
@@ -289,7 +338,8 @@ impl State {
         {
             let mut draw = draw.begin_mode2D(self.cam);
             draw.draw_circle(0, 0, 50.0, Color::PINK);
-            for (comp_i, comp) in self.circuit.components.iter().enumerate() {
+            let c = self.circuit.read().unwrap();
+            for (comp_i, comp) in c.components.iter().enumerate() {
                 let to_num_in = sls::get_num_inputs(comp);
                 let to_num_out = comp.outputs.len();
                 let to_height = calculate_comp_height(max(to_num_in, to_num_out));
@@ -408,6 +458,16 @@ impl State {
             let mid = (tp1+tp2).scale_by(0.5);
             draw.draw_circle_v(mid, 2.0, Color::BLUE);
         }
+        const BOUNDS_W:f32 = 0.4;
+        const BOUNDS_H:f32 = 0.1;
+        let w = draw.get_render_width() as f32;
+        let h = draw.get_render_height() as f32;
+        let bw = BOUNDS_W*w;
+        let bh = BOUNDS_H*h;
+        let mut tick_speed = self.tick_rate as f32;
+        draw.gui_label(Rectangle::new(w-bw, h-bh-bh, bw, bh), &format!("{}",1.0/tick_speed));
+        // draw.gui_slider(Rectangle::new(w-bw, h-bh, bw, bh),"Tick Speed","",&mut tick_speed, 0.005,0.010);
+        self.tick_rate = tick_speed as f64;
 
         //draw.gui_window_box(
         //    Rectangle::new(0.0, 0.0, 70.0, 70.0),
