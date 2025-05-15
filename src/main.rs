@@ -71,8 +71,8 @@ fn main() {
         }
     }
     //drop STATE
-    unsafe {
-        STATE.assume_init_drop();
-    }
+    // unsafe {
+    //     STATE.assume_init_drop();
+    // }
     println!("end of main!");
 }
