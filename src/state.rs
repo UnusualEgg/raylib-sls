@@ -145,7 +145,7 @@ impl State {
             let mut out_pin = Vec::with_capacity(to_num_out);
             for i in 0..to_num_out {
                 let pin_pos =
-                    Vector2::new(get_comp_size(comp) + PIN_LEN, to_out_y + (PIN_SPACING * i as f32));
+                    Vector2::new(comp.x + get_comp_size(comp) + PIN_LEN, to_out_y + (PIN_SPACING * i as f32));
                 out_pin.push(pin_pos);
             }
             out_pin_pos.push(out_pin);
@@ -274,11 +274,11 @@ impl State {
                 let comp_rect = raylib::math::Rectangle::new(comp.x, comp.y, BUTTON_SIZE, BUTTON_SIZE);
                 if comp_rect.check_collision_point_rec(current) {
                     if comp.node_type == NodeType::PULSE_BUTTON {
-                        comp.next_outputs[0] = true;
+                        comp.outputs[0] = true;
                         self.pointer_on_button = true;
                         self.circuit.comps_changed=true;
                     } else if comp.node_type == NodeType::TOGGLE_BUTTON {
-                        comp.next_outputs[0] = !comp.next_outputs[0];
+                        comp.outputs[0] = !comp.outputs[0];
                         self.pointer_on_button = true;
                         self.circuit.comps_changed=true;
                     }
@@ -295,7 +295,7 @@ impl State {
                     let comp_rect = raylib::math::Rectangle::new(comp.x, comp.y, BUTTON_SIZE, BUTTON_SIZE);
                     if comp_rect.check_collision_point_rec(last) {
                         if comp.node_type == NodeType::PULSE_BUTTON {
-                            comp.next_outputs[0] = false;
+                            comp.outputs[0] = false;
                             self.pointer_on_button = false;
                             c.comps_changed=true;
                         }
