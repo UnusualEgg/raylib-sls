@@ -333,56 +333,6 @@ impl State {
                 let to_num_in = sls::get_num_inputs(comp);
                 let to_num_out = comp.outputs.len();
                 let to_height = calculate_comp_height(comp.node_type,max(to_num_in, to_num_out));
-                match comp.node_type {
-                    sls::NodeType::LIGHT_BULB => {
-                        let b: bool = comp.outputs[0];
-                        let color = if b { Color::LIGHTGREEN } else { Color::BLACK };
-                        const LIGHT_RADIUS: f32 = COMP_SIZE / 2.0;
-                        let pos = Vector2::new(comp.x + LIGHT_RADIUS, comp.y + LIGHT_RADIUS);
-                        draw.draw_circle_v(pos, LIGHT_RADIUS, Color::GRAY);
-                        draw.draw_circle_v(pos, LIGHT_RADIUS - BUTTON_BORDER, color);
-                    }
-                    sls::NodeType::PULSE_BUTTON => {
-                        let b: bool = comp.outputs[0];
-                        let color = if b { Color::DARKRED } else { Color::RED };
-                        const BUTTON_RADIUS: f32 = BUTTON_SIZE / 2.0;
-                        let pos = Vector2::new(comp.x + BUTTON_RADIUS, comp.y + BUTTON_RADIUS);
-                        draw.draw_circle_v(pos, BUTTON_RADIUS, Color::ORANGE);
-                        draw.draw_circle_v(pos, BUTTON_RADIUS - BUTTON_BORDER, color);
-                    }
-                    sls::NodeType::TOGGLE_BUTTON => {
-                        let b: bool = comp.outputs[0];
-                        let color = if b { Color::DARKRED } else { Color::RED };
-                        let pos = Vector2::new(comp.x, comp.y);
-                        draw.draw_rectangle_v(
-                            pos,
-                            Vector2::new(BUTTON_SIZE, BUTTON_SIZE),
-                            Color::ORANGE,
-                        );
-                        let pos = Vector2::new(comp.x + BUTTON_BORDER, comp.y + BUTTON_BORDER);
-                        draw.draw_rectangle_v(
-                            pos,
-                            Vector2::new(
-                                BUTTON_SIZE - (BUTTON_BORDER * 2.0),
-                                BUTTON_SIZE - (BUTTON_BORDER * 2.0),
-                            ),
-                            color,
-                        );
-                    }
-                    sls::NodeType::NOTE => {
-                        let text: &str = comp.text.as_ref().expect("text field of NODE");
-                        draw.draw_text(text, comp.x as i32, comp.y as i32, NOTE_SIZE, Color::BLACK);
-                    }
-                    _ => {
-                        let color = if let Some(ic) = &comp.ic_instance {
-                            if ic.comps_changed {Color::VIOLET}else{Color::DARKRED}
-                        } else {
-                            Color::GRAY
-                        };
-                        let pos = Vector2::new(comp.x, comp.y);
-                        draw.draw_rectangle_v(pos, Vector2::new(COMP_SIZE, to_height), color);
-                    }
-                }
                 let label = &self.comp_labels[comp_i];
                 let size = draw.measure_text(label, LABEL_SIZE);
                 //TODO actually make sure label is below ic's
@@ -446,6 +396,57 @@ impl State {
                         draw.draw_line_ex(p1, p2, WIRE_THICKNES, color);
                     }
                 }
+                match comp.node_type {
+                    sls::NodeType::LIGHT_BULB => {
+                        let b: bool = comp.outputs[0];
+                        let color = if b { Color::LIGHTGREEN } else { Color::BLACK };
+                        const LIGHT_RADIUS: f32 = COMP_SIZE / 2.0;
+                        let pos = Vector2::new(comp.x + LIGHT_RADIUS, comp.y + LIGHT_RADIUS);
+                        draw.draw_circle_v(pos, LIGHT_RADIUS, Color::GRAY);
+                        draw.draw_circle_v(pos, LIGHT_RADIUS - BUTTON_BORDER, color);
+                    }
+                    sls::NodeType::PULSE_BUTTON => {
+                        let b: bool = comp.outputs[0];
+                        let color = if b { Color::DARKRED } else { Color::RED };
+                        const BUTTON_RADIUS: f32 = BUTTON_SIZE / 2.0;
+                        let pos = Vector2::new(comp.x + BUTTON_RADIUS, comp.y + BUTTON_RADIUS);
+                        draw.draw_circle_v(pos, BUTTON_RADIUS, Color::ORANGE);
+                        draw.draw_circle_v(pos, BUTTON_RADIUS - BUTTON_BORDER, color);
+                    }
+                    sls::NodeType::TOGGLE_BUTTON => {
+                        let b: bool = comp.outputs[0];
+                        let color = if b { Color::DARKRED } else { Color::RED };
+                        let pos = Vector2::new(comp.x, comp.y);
+                        draw.draw_rectangle_v(
+                            pos,
+                            Vector2::new(BUTTON_SIZE, BUTTON_SIZE),
+                            Color::ORANGE,
+                        );
+                        let pos = Vector2::new(comp.x + BUTTON_BORDER, comp.y + BUTTON_BORDER);
+                        draw.draw_rectangle_v(
+                            pos,
+                            Vector2::new(
+                                BUTTON_SIZE - (BUTTON_BORDER * 2.0),
+                                BUTTON_SIZE - (BUTTON_BORDER * 2.0),
+                            ),
+                            color,
+                        );
+                    }
+                    sls::NodeType::NOTE => {
+                        let text: &str = comp.text.as_ref().expect("text field of NODE");
+                        draw.draw_text(text, comp.x as i32, comp.y as i32, NOTE_SIZE, Color::BLACK);
+                    }
+                    _ => {
+                        let color = if let Some(ic) = &comp.ic_instance {
+                            if ic.comps_changed {Color::VIOLET}else{Color::DARKRED}
+                        } else {
+                            Color::GRAY
+                        };
+                        let pos = Vector2::new(comp.x, comp.y);
+                        draw.draw_rectangle_v(pos, Vector2::new(COMP_SIZE, to_height), color);
+                    }
+                }
+                
             }
         }
         draw.draw_fps(0, 0);
