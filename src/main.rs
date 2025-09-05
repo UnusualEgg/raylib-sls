@@ -64,7 +64,7 @@ fn main() {
     //static s:std::cell::LazyCell<State> = std::cell::LazyCell::new(||State::new());
     // let mut s:LazyCell<State> = LazyCell::new(||State::new());
     #[cfg(target_family = "wasm")]
-    emscripten_functions::emscripten::set_main_loop_with_arg(draw_loop,unsafe {STATE.assume_init_mut()}, 0, true);
+    emscripten::set_main_loop(draw_loop,unsafe {STATE.assume_init_mut()}, 0, true);
     println!("uhoh");
 
     #[cfg(not(target_family = "wasm"))]

@@ -56,6 +56,8 @@ const PIN_SPACING: f32 = (PIN_SIZE * 2.0) + 2.0;
 const PIN_SIZE: f32 = 5.0;
 const PIN_COLOR: Color = Color::GRAY;
 const PIN_LEN: f32 = PIN_SIZE + 2.0;
+const ON_COLOR: Color = Color::GREEN;
+const OFF_COLOR: Color = Color::BLACK;
 const WIRE_THICKNES: f32 = 2.0;
 fn calculate_comp_height(node_type:sls::NodeType,max_pins: usize) -> f32 {
     let height: f32 = (max_pins as f32 * PIN_SPACING) + MIN_OUTER_PADDING;
@@ -387,8 +389,6 @@ impl State {
                 }
                 for input in &self.comp_inputs[comp_i] {
                     let on = match comp.input_states.get(input.in_pin){Some(s)=>*s,None=>panic!("tried to get {} of {:#?}",&input.in_pin,comp)};
-                    const ON_COLOR: Color = Color::GREEN;
-                    const OFF_COLOR: Color = Color::BLACK;
                     let color = if on { ON_COLOR } else { OFF_COLOR };
                     let p1 = self.out_pin_pos[input.other_comp][input.other_pin];
                     let p2 = self.in_pin_pos[comp_i][input.in_pin];
@@ -436,6 +436,63 @@ impl State {
                         let text: &str = comp.text.as_ref().expect("text field of NODE");
                         draw.draw_text(text, comp.x as i32, comp.y as i32, NOTE_SIZE, Color::BLACK);
                     }
+                    sls::NodeType::SEVEN_SEGMENT_DISPLAY => {
+                        const SEGMENT_LENGTH:f32 = 40.0;
+                        const SEGMENT_WIDTH:f32 = 5.0;
+
+                        let pos = Vector2::new(comp.x, comp.y);
+                        draw.draw_rectangle_v(pos, Vector2::new(COMP_SIZE, to_height), Color::BLACK);
+                        let x1 = comp.x+(COMP_SIZE/2.0)-(SEGMENT_LENGTH/2.0);
+                        let x2 = comp.x+(COMP_SIZE/2.0)+(SEGMENT_LENGTH/2.0);
+                        let y1 = comp.y;
+                        let y2 = comp.y + (to_height/2.0);
+                        let y3 = comp.y + to_height;
+                        let points = [
+                            Vector2::new(x1,y1),//0
+                            Vector2::new(x2,y1),//1
+                            Vector2::new(x1,y2),//2
+                            Vector2::new(x2,y2),//3
+                            Vector2::new(x1,y3),//4
+                            Vector2::new(x2,y3),//5
+                        ];
+                        //a
+                        draw.draw_line_ex(
+                            points[0],
+                            points[1], 
+                            SEGMENT_WIDTH, if comp.input_states[0] {ON_COLOR} else {OFF_COLOR});
+                        //b
+                        draw.draw_line_ex(
+                            points[1],
+                            points[3], 
+                            SEGMENT_WIDTH, if comp.input_states[1] {ON_COLOR} else {OFF_COLOR});
+                        //c
+                        draw.draw_line_ex(
+                            points[3],
+                            points[5], 
+                            SEGMENT_WIDTH, if comp.input_states[2] {ON_COLOR} else {OFF_COLOR});
+                        //d
+                        draw.draw_line_ex(
+                            points[4],
+                            points[5], 
+                            SEGMENT_WIDTH, if comp.input_states[3] {ON_COLOR} else {OFF_COLOR});
+                        //e
+                        draw.draw_line_ex(
+                            points[2],
+                            points[4], 
+                            SEGMENT_WIDTH, if comp.input_states[4] {ON_COLOR} else {OFF_COLOR});
+                        //f
+                        draw.draw_line_ex(
+                            points[0],
+                            points[2], 
+                            SEGMENT_WIDTH, if comp.input_states[5] {ON_COLOR} else {OFF_COLOR});
+                        //g
+                        draw.draw_line_ex(
+                            points[2],
+                            points[3],
+                            SEGMENT_WIDTH, if comp.input_states[6] {ON_COLOR} else {OFF_COLOR});
+
+                    }
+                    NodeType::SEVEN_SEGMENT_DISPLAY_DECODER => {}
                     _ => {
                         let color = if let Some(ic) = &comp.ic_instance {
                             if ic.comps_changed {Color::VIOLET}else{Color::DARKRED}
